@@ -1449,12 +1449,12 @@ button{cursor:pointer;}
     e.target.value = '';
   });
 
-  // ---- 엑셀 내보내기: 단일 시트, 색상으로 입력/자동계산 구분 ----
+  // ---- 엑셀 내보내기: 단일 시트 좌우 2단(왼쪽=입력, 오른쪽=결과), 색상으로 입력/자동계산 구분 ----
   // 무료 SheetJS로는 셀 배경색을 쓸 수 없어(수식은 되지만 서식은 Pro 전용) ExcelJS로 작성한다.
   const XL_COLOR = {
     navy: 'FF0E5C6B',       // --accent : 헤더/타이틀 배경
     navyText: 'FFFFFFFF',
-    input: 'FFE4F0F1',      // --accent-soft : 사용자 입력 칸
+    input: 'FFFFD966',      // 선명한 노란색 : 사용자 입력 칸 (회색 자동계산 칸과의 대비를 최대화)
     inputText: 'FF182430',  // --ink
     auto: 'FFEDF1F4',       // --neutral-bg : 자동계산 칸
     autoText: 'FF61707D',   // --ink-muted
@@ -1463,7 +1463,8 @@ button{cursor:pointer;}
     ink: 'FF182430',
     inkMuted: 'FF61707D',
   };
-  const XL_COLS = ['A', 'B', 'C', 'D'];
+  const LEFT_COLS = ['A', 'B', 'C', 'D'];
+  const RIGHT_COLS = ['F', 'G', 'H', 'I'];
 
   document.getElementById('btnExportExcel').addEventListener('click', async () => {
     if (typeof ExcelJS === 'undefined'){
@@ -1481,10 +1482,11 @@ button{cursor:pointer;}
 
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet('비례율 시뮬레이터', { views: [{ showGridLines: false }] });
-    ws.columns = [{ width: 34 }, { width: 16 }, { width: 22 }, { width: 16 }];
-
-    let rowNum = 0;
-    function nextRow(){ rowNum += 1; return rowNum; }
+    ws.columns = [
+      { width: 34 }, { width: 16 }, { width: 22 }, { width: 16 }, // A-D: 왼쪽(입력)
+      { width: 3 },                                                // E: 구분 여백
+      { width: 34 }, { width: 16 }, { width: 22 }, { width: 16 }, // F-I: 오른쪽(결과)
+    ];
 
     function fillCell(cell, bg, color, opts){
       opts = opts || {};
@@ -1500,11 +1502,13 @@ button{cursor:pointer;}
       };
     }
 
-    // 제목 + 안내 배너 (병합, 네이비/연브라운 배경)
-    function writeBanner(text, opts){
+    // 제목/안내처럼 전체 폭(A~I)을 쓰는 배너
+    let topRow = 0;
+    function nextTopRow(){ topRow += 1; return topRow; }
+    function writeFullBanner(text, opts){
       opts = opts || {};
-      const row = nextRow();
-      ws.mergeCells('A' + row + ':D' + row);
+      const row = nextTopRow();
+      ws.mergeCells('A' + row + ':I' + row);
       const cell = ws.getCell('A' + row);
       cell.value = text;
       fillCell(cell, opts.bg, opts.color, { bold: opts.bold, size: opts.size, wrap: true, align: { horizontal: opts.center ? 'center' : 'left', wrapText: true } });
@@ -1512,85 +1516,98 @@ button{cursor:pointer;}
       return row;
     }
 
-    // 섹션 소제목 (배경 없이, 굵은 네이비 텍스트 + 밑줄 테두리)
-    function writeSection(text){
-      const row = nextRow();
-      ws.mergeCells('A' + row + ':D' + row);
-      const cell = ws.getCell('A' + row);
-      cell.value = text;
-      cell.font = { bold: true, size: 12, color: { argb: XL_COLOR.navy } };
-      cell.border = { bottom: { style: 'medium', color: { argb: XL_COLOR.navy } } };
-      ws.getRow(row).height = 20;
-      return row;
-    }
+    // 좌/우 열은 서로 다른 속도로 채워지므로 행 번호를 독립적으로 추적한다.
+    function makeColumnWriter(cols, startRow){
+      let row = startRow - 1;
+      function nextRow(){ row += 1; return row; }
 
-    function writeSpacer(){ nextRow(); }
-
-    // 라벨(A열) + 값(B열) 한 줄. kind: 'input'(파란색, 사용자가 고치는 칸) | 'auto'(회색, 자동계산)
-    function writeField(label, value, kind, numFmt){
-      const row = nextRow();
-      const labelCell = ws.getCell('A' + row);
-      labelCell.value = label;
-      labelCell.font = { size: 11, color: { argb: XL_COLOR.ink } };
-      labelCell.alignment = { vertical: 'middle', wrapText: true };
-      const valueCell = ws.getCell('B' + row);
-      valueCell.value = value;
-      if (kind === 'input'){
-        fillCell(valueCell, XL_COLOR.input, XL_COLOR.inputText, { numFmt: numFmt, align: { horizontal: 'right' } });
-      } else {
-        fillCell(valueCell, XL_COLOR.auto, XL_COLOR.autoText, { numFmt: numFmt, align: { horizontal: 'right' } });
+      function writeSection(text){
+        const r2 = nextRow();
+        ws.mergeCells(cols[0] + r2 + ':' + cols[3] + r2);
+        const cell = ws.getCell(cols[0] + r2);
+        cell.value = text;
+        cell.font = { bold: true, size: 12, color: { argb: XL_COLOR.navy } };
+        cell.border = { bottom: { style: 'medium', color: { argb: XL_COLOR.navy } } };
+        ws.getRow(r2).height = 20;
+        return r2;
       }
-      return row;
+
+      function writeSpacer(){ nextRow(); }
+
+      // 라벨(첫 열) + 값(둘째 열) 한 줄. kind: 'input'(노란색, 사용자가 고치는 칸) | 'auto'(회색, 자동계산)
+      function writeField(label, value, kind, numFmt){
+        const r2 = nextRow();
+        const labelCell = ws.getCell(cols[0] + r2);
+        labelCell.value = label;
+        labelCell.font = { size: 11, color: { argb: XL_COLOR.ink } };
+        labelCell.alignment = { vertical: 'middle', wrapText: true };
+        const valueCell = ws.getCell(cols[1] + r2);
+        valueCell.value = value;
+        if (kind === 'input'){
+          fillCell(valueCell, XL_COLOR.input, XL_COLOR.inputText, { numFmt: numFmt, align: { horizontal: 'right' } });
+        } else {
+          fillCell(valueCell, XL_COLOR.auto, XL_COLOR.autoText, { numFmt: numFmt, align: { horizontal: 'right' } });
+        }
+        return r2;
+      }
+
+      function writeTableHeader(labels){
+        const r2 = nextRow();
+        labels.forEach((h, i) => {
+          const cell = ws.getCell(cols[i] + r2);
+          cell.value = h;
+          cell.font = { bold: true, size: 10.5, color: { argb: XL_COLOR.navy } };
+          cell.border = { bottom: { style: 'thin', color: { argb: XL_COLOR.navy } } };
+        });
+        return r2;
+      }
+
+      return { nextRow, writeSection, writeSpacer, writeField, writeTableHeader, cols: cols };
     }
 
-    function cellAddr(col, row){ return col + row; }
-
-    // ── 1. 제목 + 사용법 안내 ─────────────────────────────
-    writeBanner('🏢 비례율 시뮬레이터' + (projectName ? ' — ' + projectName : ''), { bg: XL_COLOR.navy, color: XL_COLOR.navyText, bold: true, size: 16, height: 28, center: true });
-    writeBanner(
-      '사용법 ① 파란색 칸(입력값)에 원하는 숫자를 넣어보세요 ② 회색 칸(자동계산)과 위쪽 결과 요약이 즉시 바뀝니다 ' +
-      '③ 결과를 보면서 시나리오를 바꿔가며 비교해보세요.  ※ 엑셀 상단 "수식" 탭 → "계산 옵션"이 "자동"으로 되어 있어야 실시간으로 재계산됩니다.',
+    // ── 제목 + 사용법 안내 (전체 폭) ─────────────────────────────
+    writeFullBanner('🏢 비례율 시뮬레이터' + (projectName ? ' — ' + projectName : ''), { bg: XL_COLOR.navy, color: XL_COLOR.navyText, bold: true, size: 16, height: 28, center: true });
+    writeFullBanner(
+      '사용법 ① 노란색 칸(입력값)에 원하는 숫자를 넣어보세요 ② 회색 칸(자동계산)과 왼쪽 위 결과 요약이 즉시 바뀝니다 ' +
+      '③ 오른쪽 열(결과·비교자료)을 보면서 시나리오를 바꿔가며 비교해보세요.  ※ 엑셀 상단 "수식" 탭 → "계산 옵션"이 "자동"으로 되어 있어야 실시간으로 재계산됩니다.',
       { bg: XL_COLOR.guide, color: XL_COLOR.ink, size: 10.5, height: 46 }
     );
-    writeSpacer();
+    const contentStartRow = topRow + 2; // 배너 다음 한 줄 띄우고 좌/우 열 시작
 
-    // ── 2. 결과 요약 (자동계산, 회색 + 큰 글씨로 강조) ─────────────────────────────
-    const rate0Row = writeField('기존 비례율', r.rate0 || 0, 'auto', '0.00%');
+    const L = makeColumnWriter(LEFT_COLS, contentStartRow);
+    const R = makeColumnWriter(RIGHT_COLS, contentStartRow);
+
+    // ── 왼쪽 열: 결과 요약 (자동계산, 회색 + 큰 글씨로 강조) ─────────────────────────────
+    const rate0Row = L.writeField('기존 비례율', r.rate0 || 0, 'auto', '0.00%');
     ws.getCell('B' + rate0Row).font = { bold: true, size: 15, color: { argb: XL_COLOR.autoText } };
-    const rate1Row = writeField('변경 후 비례율', r.rate1 || 0, 'auto', '0.00%');
+    const rate1Row = L.writeField('변경 후 비례율', r.rate1 || 0, 'auto', '0.00%');
     ws.getCell('B' + rate1Row).font = { bold: true, size: 15, color: { argb: XL_COLOR.autoText } };
-    const perMemberRow = writeField('조합원 1인당 평균 증감액(만원)', r.perMember != null ? Math.round(r.perMember / 10000) : 0, 'auto', '#,##0');
+    const perMemberRow = L.writeField('조합원 1인당 평균 증감액(만원)', r.perMember != null ? Math.round(r.perMember / 10000) : 0, 'auto', '#,##0');
     ws.getCell('B' + perMemberRow).font = { bold: true, size: 15, color: { argb: XL_COLOR.autoText } };
     ws.getCell('C' + perMemberRow).value = '(+ 면 추가분담금 / − 면 환급금)';
     ws.getCell('C' + perMemberRow).font = { italic: true, size: 10, color: { argb: XL_COLOR.inkMuted } };
-    writeSpacer();
+    L.writeSpacer();
 
-    // ── 3. 기본 정보 (입력) ─────────────────────────────
-    writeSection('■ 기본 정보 (파란 칸에 입력하세요)');
-    writeField('구역명', projectName, 'input');
-    const cRow = writeField('종전자산가액(C, 만원)', toNumber(document.getElementById('a_C').value), 'input', '#,##0');
-    writeField('연면적(㎡)', toNumber(document.getElementById('a_areaSqm').value), 'input', '#,##0.00');
-    writeField('평당 공사비(만원)', toNumber(document.getElementById('a_pricePerPyeong').value), 'input', '#,##0');
-    const totalCostRow = writeField('총공사비(만원)', toNumber(document.getElementById('a_totalCost').value), 'input', '#,##0');
-    const b0Row = writeField('총지출(만원, 변경 전 총사업비)', toNumber(document.getElementById('a_totalExpense').value), 'input', '#,##0');
-    const etcRow = writeField('기타사업비(자동계산, 만원)', 0, 'auto', '#,##0');
-    const a0Row = writeField('총수입(만원, 변경 전 총수입)', toNumber(document.getElementById('a_totalIncome').value), 'input', '#,##0');
+    // ── 왼쪽 열: 기본 정보 (입력) ─────────────────────────────
+    L.writeSection('■ 기본 정보 (노란 칸에 입력하세요)');
+    L.writeField('구역명', projectName, 'input');
+    const cRow = L.writeField('종전자산가액(C, 만원)', toNumber(document.getElementById('a_C').value), 'input', '#,##0');
+    L.writeField('연면적(㎡)', toNumber(document.getElementById('a_areaSqm').value), 'input', '#,##0.00');
+    L.writeField('평당 공사비(만원)', toNumber(document.getElementById('a_pricePerPyeong').value), 'input', '#,##0');
+    const totalCostRow = L.writeField('총공사비(만원)', toNumber(document.getElementById('a_totalCost').value), 'input', '#,##0');
+    const b0Row = L.writeField('총지출(만원, 변경 전 총사업비)', toNumber(document.getElementById('a_totalExpense').value), 'input', '#,##0');
+    const etcRow = L.writeField('기타사업비(자동계산, 만원)', 0, 'auto', '#,##0');
+    const a0Row = L.writeField('총수입(만원, 변경 전 총수입)', toNumber(document.getElementById('a_totalIncome').value), 'input', '#,##0');
     ws.getCell('B' + etcRow).value = { formula: 'B' + b0Row + '-B' + totalCostRow, result: (s.etc != null ? window.RateCalc.wonToManwon(s.etc) : 0) };
-    writeSpacer();
+    L.writeSpacer();
 
-    // ── 4. 평형별 표 (입력) + 합계(자동계산) ─────────────────────────────
+    // ── 왼쪽 열: 평형별 표 (입력) + 합계(자동계산) ─────────────────────────────
     function writeUnitTable(title, containerId, cachedCount, cachedAmountManwon){
-      writeSection(title);
-      const headerRow = nextRow();
-      ['평형', '세대수', '세대당 분양가(만원)'].forEach((h, i) => {
-        const cell = ws.getCell(XL_COLS[i] + headerRow);
-        cell.value = h;
-        cell.font = { bold: true, size: 10.5, color: { argb: XL_COLOR.navy } };
-        cell.border = { bottom: { style: 'thin', color: { argb: XL_COLOR.navy } } };
-      });
+      L.writeSection(title);
+      L.writeTableHeader(['평형', '세대수', '세대당 분양가(만원)']);
       const dataRows = [];
       Array.from(document.getElementById(containerId).querySelectorAll('.unit-row')).forEach(row => {
-        const rr = nextRow();
+        const rr = L.nextRow();
         dataRows.push(rr);
         const label = ws.getCell('A' + rr); label.value = row.querySelector('.label-input').value;
         fillCell(label, XL_COLOR.input, XL_COLOR.inputText);
@@ -1599,7 +1616,7 @@ button{cursor:pointer;}
         const price = ws.getCell('C' + rr); price.value = toNumber(row.querySelector('.price-input').value);
         fillCell(price, XL_COLOR.input, XL_COLOR.inputText, { numFmt: '#,##0', align: { horizontal: 'right' } });
       });
-      const sumRow = nextRow();
+      const sumRow = L.nextRow();
       ws.getCell('A' + sumRow).value = '합계(자동계산)';
       ws.getCell('A' + sumRow).font = { italic: true, size: 10, color: { argb: XL_COLOR.autoText } };
       const countSumCell = ws.getCell('B' + sumRow);
@@ -1617,28 +1634,27 @@ button{cursor:pointer;}
       }
       fillCell(countSumCell, XL_COLOR.auto, XL_COLOR.autoText, { numFmt: '#,##0', align: { horizontal: 'right' } });
       fillCell(priceSumCell, XL_COLOR.auto, XL_COLOR.autoText, { numFmt: '#,##0', align: { horizontal: 'right' } });
-      writeSpacer();
+      L.writeSpacer();
       return { dataRows, sumRow };
     }
 
-    const memberTable = writeUnitTable('■ 조합원분양 평형별 (파란 칸에 입력)', 'a_memberRows', s.memberCount, window.RateCalc.wonToManwon(s.memberJeobun));
-    const generalTable = writeUnitTable('■ 일반분양 평형별 (파란 칸에 입력)', 'a_generalRows', s.generalUnits, window.RateCalc.wonToManwon(s.memberIlban));
+    const memberTable = writeUnitTable('■ 조합원분양 평형별 (노란 칸에 입력)', 'a_memberRows', s.memberCount, window.RateCalc.wonToManwon(s.memberJeobun));
+    const generalTable = writeUnitTable('■ 일반분양 평형별 (노란 칸에 입력)', 'a_generalRows', s.generalUnits, window.RateCalc.wonToManwon(s.memberIlban));
 
-    // ── 5. 변경값 (입력) ─────────────────────────────
-    writeSection('■ 변경값 (파란 칸에 입력)');
-    writeField('일반분양 예상 변경 후 분양가(만원)', document.getElementById('c_repNewPrice').value ? toNumber(document.getElementById('c_repNewPrice').value) : '', 'input', '#,##0');
-    writeField('예상 평당공사비(만원)', document.getElementById('c_repNewPricePerPyeong').value ? toNumber(document.getElementById('c_repNewPricePerPyeong').value) : '', 'input', '#,##0');
-    writeField('기타사업비 변경액(만원)', document.getElementById('c_etcInput').value ? toNumber(document.getElementById('c_etcInput').value) : '', 'input', '#,##0');
-    const appraisalRow = writeField('감정가(만원)', myAppraisal != null ? window.RateCalc.wonToManwon(myAppraisal) : '', 'input', '#,##0');
-    writeSpacer();
+    // ── 왼쪽 열: 변경값 (입력) ─────────────────────────────
+    L.writeSection('■ 변경값 (노란 칸에 입력)');
+    L.writeField('일반분양 예상 변경 후 분양가(만원)', document.getElementById('c_repNewPrice').value ? toNumber(document.getElementById('c_repNewPrice').value) : '', 'input', '#,##0');
+    L.writeField('예상 평당공사비(만원)', document.getElementById('c_repNewPricePerPyeong').value ? toNumber(document.getElementById('c_repNewPricePerPyeong').value) : '', 'input', '#,##0');
+    L.writeField('기타사업비 변경액(만원)', document.getElementById('c_etcInput').value ? toNumber(document.getElementById('c_etcInput').value) : '', 'input', '#,##0');
+    const appraisalRow = L.writeField('감정가(만원)', myAppraisal != null ? window.RateCalc.wonToManwon(myAppraisal) : '', 'input', '#,##0');
+    L.writeSpacer();
 
-    // ── 6. 자동계산 파생값 (위 결과 수식이 참조) ─────────────────────────────
-    writeSection('■ 자동계산 파생값 (위 결과 요약이 이 값들을 참조합니다)');
-    const memberCountRow = writeField('조합원수(자동계산)', 0, 'auto', '#,##0');
+    // ── 왼쪽 열: 자동계산 파생값 (결과 요약 수식이 참조) ─────────────────────────────
+    L.writeSection('■ 자동계산 파생값 (왼쪽 위 결과 요약이 이 값들을 참조합니다)');
+    const memberCountRow = L.writeField('조합원수(자동계산)', 0, 'auto', '#,##0');
     ws.getCell('B' + memberCountRow).value = { formula: 'B' + memberTable.sumRow, result: s.memberCount };
-    const b1Row = writeField('총사업비 변경 후(자동계산, 만원)', window.RateCalc.wonToManwon(change.B1), 'auto', '#,##0');
-    const a1Row = writeField('총수입 변경 후(자동계산, 만원)', window.RateCalc.wonToManwon(change.A1), 'auto', '#,##0');
-    writeSpacer();
+    const b1Row = L.writeField('총사업비 변경 후(자동계산, 만원)', window.RateCalc.wonToManwon(change.B1), 'auto', '#,##0');
+    const a1Row = L.writeField('총수입 변경 후(자동계산, 만원)', window.RateCalc.wonToManwon(change.A1), 'auto', '#,##0');
 
     // ── 결과 요약 수식 연결 (핵심 계산은 값이 아니라 수식) ─────────────────────────────
     ws.getCell('B' + rate0Row).value = { formula: '(B' + a0Row + '-B' + b0Row + ')/B' + cRow, result: r.rate0 || 0 };
@@ -1648,38 +1664,61 @@ button{cursor:pointer;}
       result: r.perMember != null ? Math.round(r.perMember / 10000) : 0,
     };
 
-    // ── 7. 평형별 분담금 비교 (감정가 기준) ─────────────────────────────
+    // ── 오른쪽 열: 평형별 분담금 비교 (감정가 기준) ─────────────────────────────
     if (myAppraisal != null && r.rate1 != null){
       const memberRowsForTable = Array.from(document.getElementById('a_memberRows').querySelectorAll('.unit-row'))
         .map(row => ({ label: row.querySelector('.label-input').value, unitPrice: toWon(row.querySelector('.price-input').value) }))
         .filter(row => row.label && row.unitPrice);
       if (memberRowsForTable.length){
         const compTable = window.RateCalc.calcUnitComparisonTable(memberRowsForTable, myAppraisal, r.rate1);
-        writeSection('■ 평형별 분담금 비교 (감정가 기준, 자동계산)');
-        const headerRow = nextRow();
-        ['평형', '조합원분양가(만원)', '권리가액(만원)', '분담금(만원)'].forEach((h, i) => {
-          const cell = ws.getCell(XL_COLS[i] + headerRow);
-          cell.value = h;
-          cell.font = { bold: true, size: 10.5, color: { argb: XL_COLOR.navy } };
-          cell.border = { bottom: { style: 'thin', color: { argb: XL_COLOR.navy } } };
-        });
+        R.writeSection('■ 평형별 분담금 비교 (감정가 기준, 자동계산)');
+        R.writeTableHeader(['평형', '조합원분양가(만원)', '권리가액(만원)', '분담금(만원)']);
         compTable.forEach(row => {
-          const rr = nextRow();
-          const labelCell = ws.getCell('A' + rr); labelCell.value = row.label;
+          const rr = R.nextRow();
+          const labelCell = ws.getCell('F' + rr); labelCell.value = row.label;
           fillCell(labelCell, XL_COLOR.input, XL_COLOR.inputText);
-          const priceCell = ws.getCell('B' + rr); priceCell.value = window.RateCalc.wonToManwon(row.memberPrice);
+          const priceCell = ws.getCell('G' + rr); priceCell.value = window.RateCalc.wonToManwon(row.memberPrice);
           fillCell(priceCell, XL_COLOR.input, XL_COLOR.inputText, { numFmt: '#,##0', align: { horizontal: 'right' } });
-          const rightsCell = ws.getCell('C' + rr);
+          const rightsCell = ws.getCell('H' + rr);
           rightsCell.value = { formula: '$B$' + appraisalRow + '*$B$' + rate1Row, result: window.RateCalc.wonToManwon(row.rightsValue) };
           fillCell(rightsCell, XL_COLOR.auto, XL_COLOR.autoText, { numFmt: '#,##0', align: { horizontal: 'right' } });
-          const duesCell = ws.getCell('D' + rr);
-          duesCell.value = { formula: 'B' + rr + '-C' + rr, result: window.RateCalc.wonToManwon(row.dues) };
+          const duesCell = ws.getCell('I' + rr);
+          duesCell.value = { formula: 'G' + rr + '-H' + rr, result: window.RateCalc.wonToManwon(row.dues) };
           fillCell(duesCell, XL_COLOR.auto, XL_COLOR.autoText, { numFmt: '#,##0', align: { horizontal: 'right' } });
         });
+        R.writeSpacer();
       }
     }
 
+    // ── 오른쪽 열: 목표값찾기 (비례율 100% 기준, 자동계산) ─────────────────────────────
+    if (r.rate1 != null && s.C){
+      R.writeSection('■ 목표값찾기 — 비례율 100% 기준 (자동계산)');
+      if (r.rate1 > 1.001){
+        R.writeField('비례율 상태', '100% 초과 (초과분을 기타사업비로 이동 처리하는 경우가 많음)', null);
+        const shiftRow = R.writeField('기타사업비 이동 추정액(만원)', 0, 'auto', '#,##0');
+        ws.getCell('G' + shiftRow).value = {
+          formula: 'B' + a1Row + '-B' + cRow + '-B' + b1Row,
+          result: Math.round(window.RateCalc.solveReserveShiftToTarget(change.A1, change.B1, s.C, 1.0) / 10000),
+        };
+        const perShiftRow = R.writeField('└ 조합원 1인당(만원)', 0, 'auto', '#,##0');
+        ws.getCell('G' + perShiftRow).value = { formula: 'G' + shiftRow + '/B' + memberCountRow, result: s.memberCount ? Math.round(window.RateCalc.solveReserveShiftToTarget(change.A1, change.B1, s.C, 1.0) / 10000 / s.memberCount) : 0 };
+      } else if (r.rate1 < 0.999){
+        R.writeField('비례율 상태', '100% 미만 (조합원분양가 인상으로 근접시키는 경우가 많음)', null);
+        const increaseRow = R.writeField('조합원분양가 인상 필요액(만원)', 0, 'auto', '#,##0');
+        ws.getCell('G' + increaseRow).value = {
+          formula: 'B' + cRow + '-B' + a1Row + '+B' + b1Row,
+          result: Math.round(window.RateCalc.solveMemberPriceIncreaseToTarget(change.A1, change.B1, s.C, 1.0) / 10000),
+        };
+        const perIncreaseRow = R.writeField('└ 조합원 1인당(만원)', 0, 'auto', '#,##0');
+        ws.getCell('G' + perIncreaseRow).value = { formula: 'G' + increaseRow + '/B' + memberCountRow, result: s.memberCount ? Math.round(window.RateCalc.solveMemberPriceIncreaseToTarget(change.A1, change.B1, s.C, 1.0) / 10000 / s.memberCount) : 0 };
+      } else {
+        R.writeField('비례율 상태', '이미 100%에 근접', null);
+      }
+      R.writeSpacer();
+    }
+
     ws.getColumn(1).alignment = { vertical: 'middle', wrapText: true };
+    ws.getColumn(6).alignment = { vertical: 'middle', wrapText: true };
 
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
