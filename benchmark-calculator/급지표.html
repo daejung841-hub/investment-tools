@@ -1,0 +1,344 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>급지표</title>
+<script src="../config.js"></script>
+<script src="../gate.js"></script>
+<script>requireSiteAuth('../index.html');</script>
+<style>
+  :root{
+    --bg:#f7f7f5; --card-bg:#fff; --border:#e2e2df; --text:#222; --muted:#888;
+    --base-color:#2563eb; --compare-color:#f97316;
+  }
+  body{ margin:0; font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); }
+  .header{ padding:16px 20px 4px; }
+  .header h1{ font-size:20px; margin:0 0 4px; }
+  .header .criteria{ font-size:13px; color:var(--muted); }
+  .tabs{ display:flex; gap:6px; padding:12px 20px; flex-wrap:wrap; border-bottom:1px solid var(--border); }
+  .tab-btn{ padding:6px 14px; border-radius:16px; border:1px solid var(--border); background:var(--card-bg); cursor:pointer; font-size:13px; }
+  .tab-btn.active{ background:var(--base-color); color:#fff; border-color:var(--base-color); }
+  .district-section{ padding:16px 20px; }
+  .district-section h2{ font-size:15px; margin:0 0 10px; }
+  .card-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px; margin-bottom:20px; }
+  .complex-card{ border:2px solid var(--border); border-radius:10px; padding:10px 12px; background:var(--card-bg); cursor:pointer; user-select:none; }
+  .complex-card .name{ font-weight:700; font-size:14px; margin-bottom:4px; }
+  .complex-card .meta{ font-size:12px; color:var(--muted); }
+  .complex-card.role-base{ border-color:var(--base-color); box-shadow:0 0 0 1px var(--base-color) inset; }
+  .complex-card.role-compare{ border-color:var(--compare-color); box-shadow:0 0 0 1px var(--compare-color) inset; }
+  .complex-card .role-badge{ display:none; font-size:11px; font-weight:700; margin-top:4px; }
+  .complex-card.role-base .role-badge{ display:block; color:var(--base-color); }
+  .complex-card.role-compare .role-badge{ display:block; color:var(--compare-color); }
+  .bottom-bar{ position:fixed; left:0; right:0; bottom:0; background:var(--card-bg); border-top:1px solid var(--border); padding:10px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .bottom-bar .chip{ font-size:12px; padding:4px 10px; border-radius:12px; background:#eee; }
+  .bottom-bar .chip.base{ background:var(--base-color); color:#fff; }
+  .bottom-bar .chip.compare{ background:var(--compare-color); color:#fff; }
+  .bottom-bar .empty{ font-size:12px; color:var(--muted); }
+  .bottom-bar button{ margin-left:auto; padding:8px 18px; border-radius:8px; border:none; background:var(--base-color); color:#fff; font-weight:700; cursor:pointer; }
+  .bottom-bar button:disabled{ background:#ccc; cursor:not-allowed; }
+  body{ padding-bottom:60px; }
+  .ctx-menu{ position:fixed; background:var(--card-bg); border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.15); padding:4px 0; z-index:100; }
+  .ctx-menu button{ display:block; width:100%; padding:8px 16px; border:none; background:none; text-align:left; cursor:pointer; font-size:13px; }
+  .ctx-menu button:hover{ background:var(--bg); }
+  .all-grid-wrap{ overflow:auto; max-height:calc(100vh - 200px); padding:0 20px 20px; }
+  .all-grid{ border-collapse:collapse; }
+  .all-grid th, .all-grid td{ border:1px solid var(--border); padding:6px; vertical-align:top; }
+  .all-grid thead th{ position:sticky; top:0; background:var(--bg); font-size:12px; white-space:nowrap; z-index:2; }
+  .all-grid tbody th{ position:sticky; left:0; background:var(--bg); font-size:12px; white-space:nowrap; text-align:right; padding-right:10px; z-index:1; }
+  .all-grid thead th:first-child{ position:sticky; left:0; z-index:3; }
+  .all-grid td{ min-width:150px; }
+  .all-grid .complex-card{ padding:6px 8px; margin-bottom:6px; }
+  .all-grid .complex-card:last-child{ margin-bottom:0; }
+  .all-grid .complex-card .name{ font-size:12px; margin-bottom:2px; }
+  .all-grid .complex-card .meta{ font-size:11px; }
+</style>
+
+<div class="header">
+  <h1>급지표</h1>
+  <div class="criteria">분류 기준: 최신월 매매일반평균가 (고정 6구간)</div>
+</div>
+<div class="tabs" id="priceTabs"></div>
+<div id="bandContent"></div>
+<div class="bottom-bar" id="bottomBar"></div>
+
+<script src="shared.js"></script>
+<script src="seedComplexes.js"></script>
+<script>
+const ALL = window.SEED_COMPLEXES || [];
+let bands = [];
+let activeTab = 'seoul-all'; // 'seoul-all' | 'gyeonggi-all' | bands 배열 인덱스(0~5)
+
+const SEOUL_DISTRICTS = [
+  '강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구',
+  '동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구',
+  '용산구','은평구','종로구','중구','중랑구'
+];
+function isSeoulDistrict(d){ return d && SEOUL_DISTRICTS.includes(d); }
+
+const MAX_TOTAL_SELECTED = 11; // 기준 1 + 비교 10 (계산기 MAX_SLOTS와 동일)
+let baseId = null;
+let compareIds = []; // 클릭 순서 유지
+
+function roleOf(id){
+  if (id === baseId) return 'base';
+  if (compareIds.includes(id)) return 'compare';
+  return null;
+}
+
+function totalSelectedCount(){
+  return (baseId ? 1 : 0) + compareIds.length;
+}
+
+function selectAsBase(id){
+  if (baseId === id) return;
+  compareIds = compareIds.filter(x => x !== id);
+  if (baseId && !compareIds.includes(baseId)){
+    if (compareIds.length >= MAX_TOTAL_SELECTED - 1){
+      compareIds[compareIds.length - 1] = baseId;
+    } else {
+      compareIds.push(baseId);
+    }
+  }
+  baseId = id;
+}
+
+function toggleCard(id){
+  if (id === baseId){
+    baseId = null;
+    renderBandContent(); renderBottomBar();
+    return;
+  }
+  const compareIdx = compareIds.indexOf(id);
+  if (compareIdx >= 0){
+    compareIds.splice(compareIdx, 1);
+    renderBandContent(); renderBottomBar();
+    return;
+  }
+  if (totalSelectedCount() >= MAX_TOTAL_SELECTED){
+    alert('최대 '+MAX_TOTAL_SELECTED+'개(기준 1 + 비교 10)까지만 선택할 수 있습니다.');
+    return;
+  }
+  if (!baseId){
+    baseId = id;
+  } else {
+    compareIds.push(id);
+  }
+  renderBandContent(); renderBottomBar();
+}
+
+function renderBottomBar(){
+  const bar = document.getElementById('bottomBar');
+  const chips = [];
+  if (baseId){
+    const c = ALL.find(x=>x.id===baseId);
+    if (c) chips.push('<span class="chip base">기준: '+esc(c.name)+'</span>');
+  }
+  compareIds.forEach(id => {
+    const c = ALL.find(x=>x.id===id);
+    if (c) chips.push('<span class="chip compare">'+esc(c.name)+'</span>');
+  });
+  bar.innerHTML = (chips.length ? chips.join('') : '<span class="empty">단지를 클릭해 선택하세요</span>') +
+    '<button id="compareBtn"'+(baseId ? '' : ' disabled')+'>시세비교</button>';
+  document.getElementById('compareBtn').addEventListener('click', goToCalculator);
+}
+
+function goToCalculator(){
+  if (!baseId) return;
+  const params = new URLSearchParams();
+  params.set('기준단지', baseId);
+  if (compareIds.length) params.set('비교단지', compareIds.join(','));
+  window.location.href = '벤치마크_배율_계산기.html?' + params.toString();
+}
+
+function esc(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderTabs(){
+  const el = document.getElementById('priceTabs');
+  el.innerHTML = '';
+  const seoulBtn = document.createElement('button');
+  seoulBtn.className = 'tab-btn' + (activeTab==='seoul-all' ? ' active' : '');
+  seoulBtn.textContent = '전체보기(서울)';
+  seoulBtn.addEventListener('click', () => { activeTab='seoul-all'; renderTabs(); renderBandContent(); });
+  el.appendChild(seoulBtn);
+  const gyeonggiBtn = document.createElement('button');
+  gyeonggiBtn.className = 'tab-btn' + (activeTab==='gyeonggi-all' ? ' active' : '');
+  gyeonggiBtn.textContent = '전체보기(경기·인천)';
+  gyeonggiBtn.addEventListener('click', () => { activeTab='gyeonggi-all'; renderTabs(); renderBandContent(); });
+  el.appendChild(gyeonggiBtn);
+  bands.forEach((band, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (activeTab===i ? ' active' : '');
+    btn.textContent = band.label + ' (' + band.ids.length + ')';
+    btn.addEventListener('click', () => { activeTab=i; renderTabs(); renderBandContent(); });
+    el.appendChild(btn);
+  });
+}
+
+function groupByDistrict(ids){
+  const byDistrict = new Map();
+  const unclassified = [];
+  ids.forEach(id => {
+    const complex = ALL.find(c => c.id === id);
+    if (!complex) return;
+    if (complex.district){
+      if (!byDistrict.has(complex.district)) byDistrict.set(complex.district, []);
+      byDistrict.get(complex.district).push(complex);
+    } else {
+      unclassified.push(complex);
+    }
+  });
+  return { byDistrict, unclassified };
+}
+
+function cardHtml(complex){
+  const units = complex.units!=null ? complex.units+'세대' : '정보없음';
+  const age = window.SharedLib.ageLabel(complex.builtYear);
+  const role = roleOf(complex.id);
+  const roleClass = role ? ' role-'+role : '';
+  const roleLabel = role === 'base' ? '기준단지' : role === 'compare' ? '비교단지' : '';
+  return '<div class="complex-card'+roleClass+'" data-id="'+esc(complex.id)+'">' +
+    '<div class="name">'+esc(complex.name)+'</div>' +
+    '<div class="meta">'+units+' · '+age+'</div>' +
+    '<div class="role-badge">'+esc(roleLabel)+'</div>' +
+    '</div>';
+}
+
+function wireCardEvents(container){
+  container.querySelectorAll('.complex-card').forEach(card => {
+    card.addEventListener('click', () => toggleCard(card.dataset.id));
+    card.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY, card.dataset.id);
+    });
+  });
+}
+
+function priceInEok(complex){
+  const rows = window.SharedLib.parseComplexCsv(complex.text);
+  const priceManwon = window.SharedLib.getLatestSaleMid(rows);
+  if (priceManwon == null) return null;
+  return Math.round(priceManwon / 1000) / 10; // 0.1억 단위 반올림
+}
+
+function renderPriceRowGrid(content, regionFilterFn){
+  const inRegion = ALL.filter(c => regionFilterFn(c.district));
+  const priced = inRegion
+    .map(c => ({ complex: c, price: priceInEok(c) }))
+    .filter(p => p.price != null);
+
+  const districts = [...new Set(inRegion.filter(c=>c.district).map(c=>c.district))]
+    .sort((a,b)=>a.localeCompare(b,'ko'));
+  const hasUnclassified = inRegion.some(c=>!c.district);
+  const cols = hasUnclassified ? [...districts, '구 미분류'] : districts;
+
+  if (!cols.length || !priced.length){
+    content.innerHTML = '<div class="district-section"><div style="color:var(--muted);font-size:13px;">해당 지역에 단지가 없습니다.</div></div>';
+    return;
+  }
+
+  const priceValues = [...new Set(priced.map(p=>p.price))].sort((a,b)=>b-a);
+
+  let html = '<div class="all-grid-wrap"><table class="all-grid"><thead><tr><th>시세(억 기준)</th>';
+  cols.forEach(d => { html += '<th>'+esc(d)+'</th>'; });
+  html += '</tr></thead><tbody>';
+  priceValues.forEach(price => {
+    html += '<tr><th>'+price.toFixed(1)+'억</th>';
+    cols.forEach(d => {
+      const entries = priced
+        .filter(p => p.price===price && (d==='구 미분류' ? !p.complex.district : p.complex.district===d))
+        .map(p => p.complex);
+      html += '<td>'+entries.map(cardHtml).join('')+'</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  content.innerHTML = html;
+}
+
+function renderBandContent(){
+  const content = document.getElementById('bandContent');
+  const isRegionTab = activeTab === 'seoul-all' || activeTab === 'gyeonggi-all';
+  const prevWrap = isRegionTab ? content.querySelector('.all-grid-wrap') : null;
+  const savedScrollLeft = prevWrap ? prevWrap.scrollLeft : 0;
+  const savedScrollTop = prevWrap ? prevWrap.scrollTop : 0;
+  content.innerHTML = '';
+  if (!bands.length) return;
+  if (isRegionTab){
+    const regionFilterFn = activeTab === 'seoul-all'
+      ? (d) => isSeoulDistrict(d)
+      : (d) => !isSeoulDistrict(d);
+    renderPriceRowGrid(content, regionFilterFn);
+    const newWrap = content.querySelector('.all-grid-wrap');
+    if (newWrap) { newWrap.scrollLeft = savedScrollLeft; newWrap.scrollTop = savedScrollTop; }
+    wireCardEvents(content);
+    return;
+  }
+  const { byDistrict, unclassified } = groupByDistrict(bands[activeTab].ids);
+  const districts = [...byDistrict.keys()].sort();
+  districts.forEach(district => {
+    const section = document.createElement('div');
+    section.className = 'district-section';
+    section.innerHTML = '<h2>'+esc(district)+'</h2><div class="card-grid">'+
+      byDistrict.get(district).map(cardHtml).join('') + '</div>';
+    content.appendChild(section);
+  });
+  if (unclassified.length){
+    const section = document.createElement('div');
+    section.className = 'district-section';
+    section.innerHTML = '<h2>구 미분류</h2><div class="card-grid">'+
+      unclassified.map(cardHtml).join('') + '</div>';
+    content.appendChild(section);
+  }
+  if (!byDistrict.size && !unclassified.length){
+    content.innerHTML = '<div class="district-section"><div style="color:var(--muted);font-size:13px;">해당 구간에 단지가 없습니다.</div></div>';
+  }
+  wireCardEvents(content);
+}
+
+function showContextMenu(x, y, id){
+  closeContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'ctx-menu';
+  menu.style.left = x+'px';
+  menu.style.top = y+'px';
+  menu.innerHTML = '<button id="ctxMakeBase">기준단지로 지정</button>';
+  document.body.appendChild(menu);
+  menu.querySelector('#ctxMakeBase').addEventListener('click', () => {
+    selectAsBase(id);
+    closeContextMenu();
+    renderBandContent(); renderBottomBar();
+  });
+  setTimeout(() => document.addEventListener('click', closeContextMenu, { once:true }), 0);
+}
+
+function closeContextMenu(){
+  document.querySelectorAll('.ctx-menu').forEach(m => m.remove());
+}
+
+function showFatalError(message){
+  const content = document.getElementById('bandContent');
+  content.innerHTML = '<div class="district-section"><div style="color:#c0392b;font-size:13px;line-height:1.6;">'+
+    esc(message)+'</div></div>';
+}
+
+function init(){
+  try {
+    if (!window.SharedLib){
+      showFatalError('shared.js를 불러오지 못했습니다. 급지표.html과 같은 폴더에 shared.js 파일이 있는지 확인하세요. (개발자 도구 콘솔에서 자세한 오류를 확인할 수 있습니다)');
+      console.error('급지표: window.SharedLib가 없습니다. <script src="shared.js"> 로드에 실패했을 수 있습니다.');
+      return;
+    }
+    if (!ALL.length){
+      showFatalError('seedComplexes.js에서 단지 데이터를 불러오지 못했습니다. 급지표.html과 같은 폴더에 seedComplexes.js 파일이 있는지 확인하세요. (개발자 도구 콘솔에서 자세한 오류를 확인할 수 있습니다)');
+      console.error('급지표: window.SEED_COMPLEXES가 비어 있거나 없습니다. <script src="seedComplexes.js"> 로드에 실패했을 수 있습니다.');
+      return;
+    }
+    bands = window.SharedLib.computePriceBands(ALL);
+    renderTabs();
+    renderBandContent();
+    renderBottomBar();
+  } catch (err) {
+    console.error('급지표 초기화 중 오류:', err);
+    showFatalError('화면을 불러오는 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err) + ' (개발자 도구 콘솔(F12)에서 자세한 내용을 확인해 알려주세요)');
+  }
+}
+init();
+</script>

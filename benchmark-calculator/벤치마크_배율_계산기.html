@@ -1,0 +1,2611 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>벤치마크 배율 계산기</title>
+<script src="../config.js"></script>
+<script src="../gate.js"></script>
+<script>requireSiteAuth('../index.html');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="shared.js"></script>
+<script src="seedComplexes.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#F4F6F8;
+  --surface:#FFFFFF;
+  --surface-alt:#EDF2F4;
+  --border:#DCE3E9;
+  --border-strong:#C6D0D7;
+  --ink:#182430;
+  --ink-muted:#61707D;
+  --ink-faint:#93A1AC;
+  --accent:#0E5C6B;
+  --accent-soft:#E4F0F1;
+  --accent-ink:#FFFFFF;
+  --good:#1E8E5A;
+  --good-bg:#E5F5EC;
+  --bad:#C63F3F;
+  --bad-bg:#FBEAEA;
+  --warn:#A9720E;
+  --warn-bg:#FBF1DF;
+  --info:#2F6FE0;
+  --info-bg:#EAF1FD;
+  --neutral-bg:#EDF1F4;
+  --shadow:0 1px 2px rgba(24,36,48,.06), 0 6px 16px -10px rgba(24,36,48,.18);
+  --series-base:#182430;
+  --series-1:#C6433D;
+  --series-2:#2F6FE0;
+  --series-3:#1E8E5A;
+  --series-4:#C97A1A;
+  --series-5:#7C5CD6;
+  --series-6:#0E9488;
+  --series-7:#D6478B;
+  --series-8:#9C8A1E;
+  --series-9:#8B5E34;
+  --series-10:#5C6B8A;
+  --bench-line:#8A93A0;
+  --font-display:'Noto Serif KR', ui-serif, 'Nanum Myeongjo', serif;
+  --font-body:'Noto Sans KR', ui-sans-serif, -apple-system, 'Malgun Gothic', sans-serif;
+  --font-mono:'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#12181D;
+    --surface:#1A2229;
+    --surface-alt:#1F2830;
+    --border:#2B3841;
+    --border-strong:#3A4750;
+    --ink:#E7ECEF;
+    --ink-muted:#9AAAB4;
+    --ink-faint:#657580;
+    --accent:#4FBAC6;
+    --accent-soft:#193338;
+    --accent-ink:#0B1418;
+    --good:#3FD495;
+    --good-bg:#123328;
+    --bad:#FF7A7A;
+    --bad-bg:#3A1D1D;
+    --warn:#E8B85B;
+    --warn-bg:#3A2E14;
+    --info:#6FA3FF;
+    --info-bg:#16233A;
+    --neutral-bg:#232D35;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 24px -14px rgba(0,0,0,.6);
+    --series-base:#F2F5F7;
+    --series-1:#FF8A7A;
+    --series-2:#7EB0FF;
+    --series-3:#4CD9A6;
+    --series-4:#F0B15B;
+    --series-5:#B7A0FF;
+    --series-6:#4DD9D9;
+    --series-7:#FF8AC4;
+    --series-8:#D9C84D;
+    --series-9:#C99A6B;
+    --series-10:#9AAAD9;
+    --bench-line:#7D8894;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#12181D;
+  --surface:#1A2229;
+  --surface-alt:#1F2830;
+  --border:#2B3841;
+  --border-strong:#3A4750;
+  --ink:#E7ECEF;
+  --ink-muted:#9AAAB4;
+  --ink-faint:#657580;
+  --accent:#4FBAC6;
+  --accent-soft:#193338;
+  --accent-ink:#0B1418;
+  --good:#3FD495;
+  --good-bg:#123328;
+  --bad:#FF7A7A;
+  --bad-bg:#3A1D1D;
+  --warn:#E8B85B;
+  --warn-bg:#3A2E14;
+  --info:#6FA3FF;
+  --info-bg:#16233A;
+  --neutral-bg:#232D35;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 24px -14px rgba(0,0,0,.6);
+  --series-base:#F2F5F7;
+  --series-1:#FF8A7A;
+  --series-2:#7EB0FF;
+  --series-3:#4CD9A6;
+  --series-4:#F0B15B;
+  --series-5:#B7A0FF;
+  --series-6:#4DD9D9;
+  --series-7:#FF8AC4;
+  --series-8:#D9C84D;
+  --series-9:#C99A6B;
+  --series-10:#9AAAD9;
+  --bench-line:#7D8894;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:14.5px;
+  line-height:1.55;
+}
+.wrap{max-width:none;margin:0;padding:22px clamp(16px,2vw,28px) 60px;}
+
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;}
+button{cursor:pointer;}
+::selection{background:var(--accent-soft);}
+
+.topbar{
+  display:flex;justify-content:space-between;align-items:flex-end;gap:16px;
+  border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:18px;flex-wrap:wrap;
+}
+.topbar h1{font-size:clamp(20px,2.6vw,27px);font-weight:700;letter-spacing:-.01em;}
+.topbar .sub{color:var(--ink-muted);font-size:13px;margin-top:4px;}
+.btn{
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-muted);
+  padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;transition:border-color .15s, color .15s, background .15s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.small{padding:6px 11px;font-size:11.5px;}
+.btn.toggle-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+.btn.fair-cta{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:700;}
+.btn.fair-cta:hover{background:var(--accent);color:var(--accent-ink);}
+.btn.fair-cta.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+.btn.upload-btn{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:700;flex:1;}
+.btn.upload-btn:hover{background:var(--accent);color:var(--accent-ink);}
+.btn:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+
+.shell-body{display:flex;gap:18px;align-items:flex-start;}
+.sidebar{
+  width:296px;flex:0 0 296px;display:flex;flex-direction:column;gap:12px;
+  position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto;padding-right:2px;
+}
+.main-col{flex:1;min-width:0;}
+@media (max-width:980px){
+  .shell-body{flex-direction:column;}
+  .sidebar{width:100%;flex:none;position:static;max-height:none;}
+}
+
+.side-block{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow);overflow:hidden;flex:none;
+}
+.side-block > summary{
+  list-style:none;cursor:pointer;padding:11px 13px;display:flex;align-items:center;justify-content:space-between;
+  font-weight:700;font-size:13px;
+}
+.side-block > summary::-webkit-details-marker{display:none;}
+.side-block > summary .chevron{color:var(--ink-faint);transition:transform .15s;font-size:11px;}
+.side-block[open] > summary .chevron{transform:rotate(90deg);}
+.side-block-body{padding:2px 13px 13px;border-top:1px solid var(--border);}
+
+.sidebar select, .sidebar .textish{width:100%;}
+.sidebar .field-label{margin:10px 0 6px;font-size:11px;}
+select, .textish{
+  border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--ink);
+  border-radius:8px;padding:8px 10px;font-size:13px;
+}
+textarea{
+  width:100%;min-height:120px;resize:vertical;border:1px solid var(--border-strong);
+  background:var(--surface-alt);color:var(--ink);border-radius:8px;padding:11px;
+  font-family:var(--font-mono);font-size:12.5px;line-height:1.5;
+}
+.sidebar textarea{min-height:90px;font-size:10.5px;padding:8px;}
+.raw-toggle{margin-top:8px;}
+.raw-toggle > summary{cursor:pointer;font-size:11.5px;color:var(--accent);list-style:none;font-weight:600;}
+.raw-toggle > summary::-webkit-details-marker{display:none;}
+.raw-toggle[open] > summary{margin-bottom:6px;}
+
+.status-line{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11.5px;color:var(--ink-muted);flex-wrap:wrap;}
+.status-line .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:none;}
+.status-line.ok .dot{background:var(--good);}
+.status-line.warn .dot{background:var(--warn);}
+.status-line.bad .dot{background:var(--bad);}
+.lib-row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.lib-row select{flex:1;min-width:0;}
+.seed-badge{
+  display:inline-flex;align-items:center;gap:6px;background:var(--info-bg);color:var(--info);
+  border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;
+}
+
+.tabs{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px;}
+.tab-btn{
+  border:1px solid var(--border);background:var(--surface-alt);color:var(--ink-muted);
+  padding:5px 10px;border-radius:999px;font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:5px;
+  max-width:100%;
+}
+.tab-btn .swatch{width:7px;height:7px;border-radius:50%;flex:none;}
+.tab-btn.active{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
+.tab-btn.active .swatch{background:var(--accent-ink) !important;}
+.tab-btn.dim{opacity:.45;}
+.slot-panel{display:none;margin-top:10px;}
+.slot-panel.active{display:block;}
+.slot-head{display:flex;gap:8px;align-items:center;}
+.compare-header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.name-input{width:100%;}
+.clear-link{background:none;border:none;color:var(--ink-faint);font-size:11px;text-decoration:underline;padding:4px;flex:none;}
+.clear-link:hover{color:var(--bad);}
+.visible-check{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;color:var(--ink-muted);cursor:pointer;}
+.visible-check input{margin:0;}
+
+.toolbar{display:flex;gap:8px;flex-direction:column;}
+.grp-label{font-size:11px;font-weight:700;color:var(--ink-muted);margin-bottom:6px;display:block;}
+.seg{display:flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+.seg button{flex:1;border:none;background:var(--surface-alt);color:var(--ink-muted);padding:7px 8px;font-size:12px;font-weight:600;border-right:1px solid var(--border-strong);}
+.seg button:last-child{border-right:none;}
+.seg button.active{background:var(--accent);color:var(--accent-ink);}
+.thresh-row{display:flex;align-items:center;gap:8px;}
+.thresh-row input[type=number]{width:64px;border:1px solid var(--border-strong);background:var(--surface-alt);border-radius:8px;padding:7px 8px;font-family:var(--font-mono);}
+.thresh-row .unit{font-size:11.5px;color:var(--ink-muted);}
+
+.section-title{display:flex;align-items:baseline;gap:10px;margin:0 0 14px;flex-wrap:wrap;}
+.section-title h2{font-size:19px;font-weight:700;}
+.section-title .hint{color:var(--ink-faint);font-size:12.5px;}
+.main-col section{margin-bottom:30px;}
+
+.cards-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;
+}
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
+  padding:17px 18px;display:flex;flex-direction:column;gap:11px;
+}
+.card-head{display:flex;align-items:center;gap:8px;}
+.card-head .swatch{width:11px;height:11px;border-radius:50%;flex:none;}
+.card-head .name{font-weight:700;font-size:14.5px;flex:1;}
+.badge{
+  align-self:flex-start;padding:4px 12px;border-radius:999px;font-weight:700;font-size:12.5px;letter-spacing:.01em;
+}
+.badge.good{background:var(--good-bg);color:var(--good);}
+.badge.bad{background:var(--bad-bg);color:var(--bad);}
+.badge.warn{background:var(--warn-bg);color:var(--warn);}
+.badge.neutral{background:var(--neutral-bg);color:var(--ink-muted);}
+.stat-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;flex-wrap:nowrap;}
+.stat-row .k{color:var(--ink-muted);white-space:nowrap;}
+.stat-row .v{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.stat-row .v.ratio-val{font-size:15px;font-weight:700;letter-spacing:.015em;}
+.v.up{color:var(--bad);}
+.v.down{color:var(--info);}
+.card-msg{font-size:12.5px;color:var(--ink-muted);line-height:1.5;}
+.reinforce-msg{font-size:12.5px;line-height:1.5;padding:8px 10px;border-radius:8px;}
+.reinforce-msg.bad{background:var(--bad-bg);color:var(--bad);}
+.sync-block{border-top:1px solid var(--border);padding-top:10px;margin-top:2px;display:flex;flex-direction:column;gap:5px;}
+.sync-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.sync-head .k{font-size:12px;color:var(--ink-muted);display:flex;align-items:center;gap:4px;}
+.info-icon{
+  position:relative;
+  display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;
+  background:var(--neutral-bg);color:var(--ink-faint);font-size:10px;font-style:normal;cursor:help;flex:none;
+  transition:background .15s, color .15s;
+}
+.info-icon:hover, .info-icon:focus-visible{background:var(--accent);color:var(--accent-ink);outline:none;}
+.info-icon::after{
+  content:attr(data-tip);
+  position:absolute;z-index:30;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  width:236px;white-space:normal;text-align:left;
+  background:var(--surface);color:var(--ink);font-family:var(--font-body);font-weight:500;
+  font-size:11.5px;line-height:1.55;padding:10px 12px;border-radius:9px;
+  border:1px solid var(--border-strong);box-shadow:var(--shadow);
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .08s ease;
+}
+.info-icon::before{
+  content:'';position:absolute;z-index:30;bottom:calc(100% + 1px);left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--border-strong);
+  opacity:0;visibility:hidden;pointer-events:none;transition:opacity .08s ease;
+}
+.info-icon:hover::after, .info-icon:focus-visible::after,
+.info-icon:hover::before, .info-icon:focus-visible::before{
+  opacity:1;visibility:visible;
+}
+.sync-badge{padding:3px 9px;border-radius:999px;font-weight:700;font-size:11.5px;white-space:nowrap;}
+.sync-badge.tier-high{background:var(--good-bg);color:var(--good);}
+.sync-badge.tier-mid{background:var(--neutral-bg);color:var(--ink-muted);}
+.sync-badge.tier-low{background:var(--warn-bg);color:var(--warn);}
+.sync-badge.tier-none{background:var(--neutral-bg);color:var(--ink-faint);}
+.sync-detail{font-size:11.5px;color:var(--ink-faint);font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.sync-msg{font-size:12px;color:var(--ink-muted);line-height:1.5;}
+.card.empty{align-items:center;justify-content:center;color:var(--ink-faint);font-size:13px;min-height:150px;text-align:center;}
+
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
+/* border-collapse:collapse는 position:sticky인 thead th와 함께 쓰면 셀
+   경계선이 스크롤을 따라가지 못해 그 틈으로 뒤쪽(이미 지나간) 행이 비쳐
+   보이는 브라우저 렌더링 버그가 있다. separate 모델로 바꿔 헤더 셀이
+   스스로 배경을 온전히 채우게 한다. */
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;min-width:560px;}
+th,td{padding:10px 14px;text-align:left;white-space:nowrap;}
+thead th{
+  background:var(--surface-alt);color:var(--ink-muted);font-size:11.5px;text-transform:uppercase;
+  letter-spacing:.04em;border-bottom:1px solid var(--border);position:sticky;top:0;
+}
+tbody tr{border-bottom:1px solid var(--border);}
+tbody tr:last-child{border-bottom:none;}
+td.num, th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+td.name-cell{display:flex;align-items:center;gap:8px;font-weight:600;}
+.chip{padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700;}
+.diag-toggle{display:inline-flex;align-items:center;gap:6px;background:none;border:none;padding:2px 0;color:inherit;font:inherit;}
+.diag-toggle .arrow{color:var(--ink-faint);font-size:10px;transition:transform .15s;}
+.diag-toggle.open .arrow{transform:rotate(90deg);}
+tr.diag-detail-row td{white-space:normal;background:var(--surface-alt);padding:14px 16px;border-bottom:1px solid var(--border);}
+.diag-detail-card{max-width:none;box-shadow:none;}
+.diag-wide{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:4px 36px;align-items:start;}
+.diag-wide-col{display:flex;flex-direction:column;gap:11px;min-width:0;}
+@media (max-width:760px){.diag-wide{grid-template-columns:1fr;}}
+
+.chart-toolbar{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;margin-bottom:14px;}
+.chart-toolbar-row{grid-column:1;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.toggle-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+@media (max-width:1100px){.chart-toolbar{grid-template-columns:1fr;}}
+.chart-tabs{display:flex;gap:6px;flex-wrap:wrap;}
+.chart-panel{display:none;}
+.chart-panel.active{display:block;}
+.chart-layout{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;align-items:start;}
+.chart-layout.solo{grid-template-columns:1fr;}
+@media (max-width:1100px){.chart-layout{grid-template-columns:1fr;}}
+.chart-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
+  padding:16px;height:520px;
+}
+.chart-canvas-wrap{position:relative;width:100%;height:100%;}
+.chart-box canvas{width:100% !important;height:100% !important;}
+.drag-select-box{position:absolute;top:0;bottom:0;background:var(--accent-soft);opacity:.65;border-left:1px dashed var(--accent);border-right:1px dashed var(--accent);pointer-events:none;}
+.recent-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
+  padding:14px;height:520px;overflow:auto;
+}
+.recent-box table{min-width:auto;font-size:12px;}
+.recent-box th,.recent-box td{padding:6px 9px;white-space:nowrap;}
+.recent-box thead th{background:var(--surface-alt);}
+/* thead th가 3줄(단지명+동조율+최고가)로 커지면서 tbody 행(1줄) 높이보다
+   훨씬 커지면, 이 표처럼 행이 많은(120개월) 스크롤 테이블에서 sticky
+   헤더 바로 위 행 하나가 헤더 뒤로 완전히 가려지지 않고 살짝 비쳐 보이는
+   현상이 생긴다. 헤더 높이를 줄여서 이 문제를 없앤다. */
+.recent-box th.name-th{font-weight:700;color:var(--ink);text-transform:none;letter-spacing:0;font-size:11.5px;padding-top:3px;padding-bottom:3px;line-height:1.25;}
+.recent-box th.name-th .ratio-tag{display:block;color:var(--ink-faint);font-weight:600;font-size:10px;margin-top:0;}
+.recent-box th.name-th .ath-tag{display:block;color:var(--ink-faint);font-weight:500;font-size:9.5px;margin-top:0;}
+.cell-ratio{color:var(--ink-faint);font-size:10.5px;}
+.recent-box td.cell-over, #summaryTable td.cell-over{background:var(--bad-bg);}
+.recent-box td.cell-over .cell-ratio, #summaryTable td.cell-over .cell-ratio{color:var(--bad);}
+.recent-box td.cell-under, #summaryTable td.cell-under{background:var(--info-bg);}
+.recent-box td.cell-under .cell-ratio, #summaryTable td.cell-under .cell-ratio{color:var(--info);}
+.chart-canvas-wrap{cursor:crosshair;user-select:none;}
+.drag-result{
+  position:absolute;left:10px;bottom:10px;z-index:5;cursor:default;user-select:text;
+  width:min(320px, calc(100% - 20px));max-height:calc(100% - 20px);overflow-y:auto;
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;
+  box-shadow:var(--shadow);padding:9px 10px;
+}
+.drag-result-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;position:sticky;top:0;background:var(--surface);}
+.drag-result-head span{font-weight:700;font-size:11.5px;}
+.drag-result-head .clear-link{font-size:14px;padding:0 2px;line-height:1;}
+.drag-result-list{display:flex;flex-direction:column;gap:3px;}
+.drag-row{display:flex;align-items:center;gap:6px;font-size:11px;padding:1px 0;}
+.drag-divider{border-top:1px dashed var(--border-strong);margin:6px 0;}
+.drag-row .swatch{width:7px;height:7px;border-radius:50%;flex:none;}
+.drag-name{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.drag-vals{display:none;}
+.drag-diff{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums;min-width:56px;text-align:right;font-size:10.5px;color:var(--ink-faint);}
+.drag-diff.up{color:var(--bad);}
+.drag-diff.down{color:var(--info);}
+.drag-rate{font-family:var(--font-mono);font-weight:700;font-variant-numeric:tabular-nums;min-width:52px;text-align:right;font-size:11px;}
+.drag-rate.up{color:var(--bad);}
+.drag-rate.down{color:var(--info);}
+.drag-empty{color:var(--ink-faint);font-size:13px;}
+.overlay-controls{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.empty-state{
+  padding:50px 20px;text-align:center;color:var(--ink-faint);border:1px dashed var(--border-strong);
+  border-radius:12px;background:var(--surface-alt);font-size:13.5px;
+}
+.common-range{font-size:11px;color:var(--ink-faint);margin-top:4px;}
+footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>벤치마크 배율 계산기</h1>
+      <div class="sub">대장 단지 대비 매매·전세 배율로 이론적 적정가를 역산해 저평가·고평가를 진단합니다</div>
+    </div>
+    <button class="btn" id="resetBtn">초기화</button>
+  </div>
+
+  <div class="shell-body">
+    <aside class="sidebar">
+      <details class="side-block" open>
+        <summary>기준 단지 (대장 단지)<span class="chevron">▸</span></summary>
+        <div class="side-block-body">
+          <select id="basePreset">
+            <option value="els">잠실엘스 (재개발 비교용)</option>
+            <option value="eunma">은마아파트 (재건축 비교용)</option>
+            <option value="benchmark-seoul">서울 일반 벤치마크 (가상 단지)</option>
+            <option value="benchmark-rebuild">재건축 벤치마크 (가상 단지)</option>
+            <option value="custom">직접입력</option>
+          </select>
+          <input class="textish name-input" id="baseName" placeholder="기준 단지명" style="margin-top:8px;">
+          <div class="lib-row">
+            <select id="baseLibSelect"><option value="">라이브러리에서 불러오기...</option></select>
+          </div>
+          <div class="lib-row">
+            <button class="btn small upload-btn" id="baseUploadBtn">📂 엑셀 파일로 단지 넣기</button>
+            <input type="file" id="baseUploadInput" accept=".xlsx,.xls" multiple hidden>
+          </div>
+          <div class="status-line" id="baseStatus"><span class="dot"></span><span>데이터를 붙여넣어주세요</span></div>
+          <details class="raw-toggle">
+            <summary>직접 붙여넣기 (고급)</summary>
+            <textarea id="baseText" placeholder="KB부동산 '시세 변동' 표를 그대로 복사해 붙여넣으세요"></textarea>
+            <div class="lib-row"><button class="btn small" id="baseLibSave">라이브러리에 저장</button></div>
+          </details>
+        </div>
+      </details>
+
+      <details class="side-block" open>
+        <summary>비교 단지 (최대 10개)<span class="chevron">▸</span></summary>
+        <div class="side-block-body">
+          <div class="compare-header-row">
+            <span class="grp-label" style="margin:0;">전체 비교단지</span>
+            <button class="clear-link" id="clearAllCompares">전체 초기화</button>
+          </div>
+          <div class="tabs" id="compareTabs"></div>
+          <div id="compareSlots"></div>
+        </div>
+      </details>
+
+      <details class="side-block" open>
+        <summary>진단 설정<span class="chevron">▸</span></summary>
+        <div class="side-block-body">
+          <div class="toolbar">
+            <div>
+              <span class="grp-label">진단 임계값</span>
+              <div class="thresh-row">
+                <input type="number" id="thresholdInput" min="0.5" max="20" step="0.5" value="3">
+                <span class="unit">%p 이내는 정상권</span>
+              </div>
+            </div>
+            <div>
+              <span class="grp-label">평균 배율 산정 기간</span>
+              <div class="seg" id="periodSeg">
+                <button data-period="all" class="active">전체</button>
+                <button data-period="10y">10년</button>
+                <button data-period="5y">5년</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>준거 단지 (선택)<span class="chevron">▸</span></summary>
+        <div class="side-block-body">
+          <div class="status-line" style="margin-top:10px;"><span class="dot"></span><span>신축·준신축처럼 자체 역사상 데이터가 짧은 단지를 위한 수동 참고 비교입니다</span></div>
+          <select id="refComplexSelect" style="margin-top:8px;"><option value="">선택 안 함</option></select>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>단지 라이브러리 (<span id="libCount">0</span>개)<span class="chevron">▸</span></summary>
+        <div class="side-block-body">
+          <div class="status-line" style="margin-top:10px;"><span class="dot"></span><span>여러 명이 같이 쓰려면 파일로 주고받으세요</span></div>
+          <div class="lib-row">
+            <button class="btn small" id="libExportBtn">내보내기</button>
+            <button class="btn small" id="libImportBtn">가져오기</button>
+            <input type="file" id="libImportInput" accept="application/json" hidden>
+          </div>
+        </div>
+      </details>
+
+      <details class="side-block">
+        <summary>공용 라이브러리 연동 (선택)<span class="chevron">▸</span></summary>
+        <div class="side-block-body">
+          <div class="status-line" style="margin-top:10px;">누군가 저장한 단지를 구글시트를 통해 다 같이 불러옵니다</div>
+          <div class="field-label">Apps Script 웹앱 URL</div>
+          <input class="textish" id="gasUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+          <div class="status-line" id="gasStatus"><span class="dot"></span><span>설정되지 않음</span></div>
+          <div class="lib-row"><button class="btn small" id="gasRefreshBtn">공용 목록 새로고침</button></div>
+        </div>
+      </details>
+    </aside>
+
+    <main class="main-col">
+      <section>
+        <div class="section-title"><h2>시세 추이 & 배율 그래프</h2><span class="hint">가장 핵심적인 화면입니다</span></div>
+        <div class="chart-toolbar">
+          <div class="chart-toolbar-row">
+            <div class="chart-tabs" id="chartTabs">
+              <button class="tab-btn active" data-chart="sale">매매가 추이</button>
+              <button class="tab-btn" data-chart="jeonse">전세가 추이</button>
+              <button class="tab-btn" data-chart="jeonseRatioSelf">전세가율 추이</button>
+              <button class="tab-btn" data-chart="saleRatio">매매 배율 추이</button>
+              <button class="tab-btn" data-chart="jeonseRatio">전세 배율 추이</button>
+              <button class="tab-btn" data-chart="overlay">배율 오버레이</button>
+              <button class="tab-btn" data-chart="multi">통합 비교</button>
+            </div>
+            <div class="toggle-group">
+              <button class="btn small fair-cta" id="fairLineToggle">📈 적정가 확인하기</button>
+              <button class="btn small fair-cta" id="ratioAvgToggle">📊 평균선 표시</button>
+              <button class="btn small fair-cta" id="ratioPeakToggle">📈 최고점 표시</button>
+              <button class="btn small fair-cta" id="ratioTroughToggle">📉 최저점 표시</button>
+              <button class="btn small fair-cta" id="benchmarkOverlayToggle">🏙️ 벤치마크 표시</button>
+              <select class="btn small" id="benchmarkOverlaySelect">
+                <option value="seoul">서울 일반 벤치마크</option>
+                <option value="rebuild">재건축 벤치마크</option>
+              </select>
+              <button class="btn small fair-cta" id="benchFairToggle">📈 벤치마크 대비 적정가</button>
+            </div>
+          </div>
+        </div>
+        <div id="chartArea"></div>
+      </section>
+
+      <section>
+        <div class="section-title"><h2>비교 요약 테이블</h2></div>
+        <div class="table-wrap"><table id="summaryTable"><thead><tr>
+          <th>단지명</th>
+          <th class="num">현재 매매가 (배율)</th><th class="num">적정가 (평균 배율)</th><th class="num">매매 배율 갭</th>
+          <th class="num">현재 전세가 (배율)</th><th class="num">적정가 (평균 배율)</th><th class="num">전세 배율 갭</th>
+          <th>진단</th>
+        </tr></thead><tbody></tbody></table></div>
+      </section>
+
+      <section>
+        <div class="section-title"><h2>진단 요약</h2><span class="hint">기준월 대비 현재 배율과 과거 평균 배율의 차이(%p)로 판단합니다</span></div>
+        <div class="cards-grid" id="summaryCards"></div>
+      </section>
+
+      <section id="refCompareSection" style="display:none;">
+        <div class="section-title"><h2>준거 단지 비교</h2><span class="hint">사이드바에서 고른 준거 단지와 기준단지를 나란히 비교합니다 (수동 참고용)</span></div>
+        <div class="card" id="refCompareCard"></div>
+      </section>
+    </main>
+  </div>
+
+  <footer>붙여넣은 데이터는 브라우저에 저장됩니다 · 단지 라이브러리는 파일 또는 공용 연동으로 공유할 수 있습니다 · 부의 레시피 벤치마크 배율 계산기 v3</footer>
+</div>
+
+<script>
+const SLOT_COLORS = ['--series-1','--series-2','--series-3','--series-4','--series-5','--series-6','--series-7','--series-8','--series-9','--series-10'];
+const MAX_SLOTS = 10;
+const STORE_KEY = 'benchmarkCalc.v3';
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function splitCells(line){
+  if (line.indexOf('\t') !== -1) return line.split('\t').map(s=>s.trim());
+  if (line.indexOf(',') !== -1) return line.split(',').map(s=>s.trim());
+  return line.trim().split(/\s+/);
+}
+function toNum(s){
+  if (s===undefined || s===null) return null;
+  const t = String(s).replace(/,/g,'').trim();
+  if (t==='') return null;
+  const n = parseFloat(t);
+  if (!Number.isFinite(n)) return null;
+  // KB부동산 시세표는 해당 월에 시세 자체가 없으면(매매/전세 미형성 시기 등) 0으로
+  // 채워 내려준다. 실제 시세가 0인 경우는 없으므로 0은 "데이터 없음"으로 취급한다.
+  return n === 0 ? null : n;
+}
+function parsePastedTable(text){
+  const lines = String(text||'').split(/\r?\n/);
+  let name = '';
+  const rows = [];
+  for (const raw of lines){
+    const line = raw.trim();
+    if (!line) continue;
+    const cells = splitCells(line);
+    if (!name && /단지명/.test(cells[0]||'') && cells[1]){
+      name = cells[1].trim();
+      continue;
+    }
+    if (/^\d{6}$/.test(cells[0]||'')){
+      const ym = parseInt(cells[0],10);
+      const mm = ym % 100;
+      if (mm < 1 || mm > 12) continue;
+      rows.push({
+        ym,
+        saleLow: toNum(cells[1]), saleMid: toNum(cells[2]), saleHigh: toNum(cells[3]),
+        jeonseLow: toNum(cells[4]), jeonseMid: toNum(cells[5]), jeonseHigh: toNum(cells[6])
+      });
+    }
+  }
+  const map = new Map();
+  for (const r of rows) map.set(r.ym, r);
+  const uniq = [...map.values()].sort((a,b)=>a.ym-b.ym);
+  return { name, rows: uniq };
+}
+function buildComplex(text, nameOverride, fallbackName){
+  const parsed = parsePastedTable(text);
+  const rowMap = new Map(parsed.rows.map(r=>[r.ym, r]));
+  const name = (nameOverride||'').trim() || parsed.name || fallbackName || '';
+  return { name, rows: parsed.rows, rowMap, parsedName: parsed.name };
+}
+function ymIndex(ym){ return Math.floor(ym/100)*12 + (ym%100-1); }
+function fmtYm(ym){ return Math.floor(ym/100)+'.'+String(ym%100).padStart(2,'0'); }
+function fmtEok(v){ if (v==null) return '—'; return (v/10000).toFixed(1)+'억'; }
+function fmtPct(v, digits){ if (v==null) return '—'; digits = digits==null?1:digits; return v.toFixed(digits)+'%'; }
+function fmtPP(v){ if (v==null) return '—'; const s = v>0?'+':''; return s+v.toFixed(1)+'%p'; }
+
+function commonYms(baseMap, compMap){
+  const out = [];
+  for (const ym of baseMap.keys()) if (compMap.has(ym)) out.push(ym);
+  return out.sort((a,b)=>a-b);
+}
+function periodFilter(yms, period){
+  if (period==='all' || !yms.length) return yms;
+  const endIdx = ymIndex(yms[yms.length-1]);
+  const span = period==='5y' ? 60 : 120;
+  const startIdx = endIdx - span + 1;
+  return yms.filter(ym => ymIndex(ym) >= startIdx);
+}
+function yearlyAvg(yms, fn){
+  if (!yms.length) return null;
+  const byYear = new Map();
+  for (const ym of yms){
+    const v = fn(ym);
+    if (v==null || !Number.isFinite(v)) continue;
+    const y = Math.floor(ym/100);
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(v);
+  }
+  const yearAvgs = [...byYear.values()].map(arr=> arr.reduce((a,b)=>a+b,0)/arr.length);
+  if (!yearAvgs.length) return null;
+  return yearAvgs.reduce((a,b)=>a+b,0)/yearAvgs.length;
+}
+function latestWithField(yms, baseMap, compMap, baseField, compField){
+  for (let i=yms.length-1;i>=0;i--){
+    const ym = yms[i];
+    const b = baseMap.get(ym)[baseField], c = compMap.get(ym)[compField];
+    if (b!=null && c!=null) return { ym, b, c };
+  }
+  return null;
+}
+function diagnose(saleDiff, jeonseDiff, threshold){
+  const cls = (d) => d==null ? 'unknown' : d <= -threshold ? 'down' : d >= threshold ? 'up' : 'flat';
+  const s = cls(saleDiff), j = cls(jeonseDiff);
+  if (s==='unknown' && j==='unknown'){
+    return { badge:'데이터 부족', tone:'neutral', message:'공통 구간의 시세 데이터가 부족해 판단할 수 없습니다.' };
+  }
+  if (s==='down' && j!=='down'){
+    return { badge:'저평가', tone:'good', message:'매매만 일시적으로 눌려 있어요. 전세는 과거 배율을 유지 중이라 갭이 메워질 여력이 있습니다.' };
+  }
+  if (s==='down' && j==='down'){
+    return { badge:'주의', tone:'warn', message:'매매뿐 아니라 전세 배율도 함께 밀려 있습니다. 동네 자체 펀더멘털 변화 가능성을 확인해야 합니다.' };
+  }
+  if (s==='up'){
+    return { badge:'고평가', tone:'bad', message: j==='down' ? '매매는 과거 배율보다 높은데 전세는 못 따라오고 있어 갭이 부담스러운 국면입니다.' : '매매 배율이 과거 평균보다 높습니다. 추격 매수보다 눌림을 기다릴 구간입니다.' };
+  }
+  if (j==='down'){
+    return { badge:'확인 필요', tone:'warn', message:'매매 배율은 정상권인데 전세만 이례적으로 빠졌습니다. 입주 물량 등 개별 원인을 확인하세요.' };
+  }
+  return { badge:'적정', tone:'neutral', message:'매매·전세 배율 모두 과거 평균 범위 안에서 움직이고 있습니다.' };
+}
+
+function jeonseRatioContextSentence(diagBadge, stats, threshold){
+  if (!stats || stats.cur==null || stats.diff==null){
+    return '전세가율 데이터가 부족해 추가로 판단하기 어렵습니다.';
+  }
+  const nearLow = stats.minVal!=null && (stats.cur - stats.minVal) <= threshold;
+  const nearHigh = stats.maxVal!=null && (stats.maxVal - stats.cur) <= threshold;
+  const belowAvg = stats.diff <= -threshold;
+  const aboveAvg = stats.diff >= threshold;
+
+  if (diagBadge==='고평가'){
+    if (nearLow) return '이 단지의 전세가율은 역사상 최저권('+fmtPct(stats.cur)+')까지 눌려 있어, 고평가 판단을 강하게 뒷받침하는 신호입니다.';
+    if (belowAvg) return '이 단지의 전세가율도 역사상 평균 대비 '+Math.abs(stats.diff).toFixed(1)+'%p 낮은 수준으로, 고평가 판단을 강화하는 신호입니다.';
+    if (aboveAvg) return '다만 이 단지의 전세가율은 역사상 평균 대비 '+stats.diff.toFixed(1)+'%p 높은 수준이라, 고평가 판단과는 엇갈리며 이를 다소 약화하는 신호입니다.';
+    return '이 단지의 전세가율은 역사상 평균 범위 안에 있어, 판단에 큰 영향을 주지는 않습니다.';
+  }
+  if (diagBadge==='저평가'){
+    if (nearHigh) return '이 단지의 전세가율은 역사상 최고권('+fmtPct(stats.cur)+')까지 올라 있어, 저평가 판단을 강하게 뒷받침하는 신호입니다.';
+    if (aboveAvg) return '이 단지의 전세가율도 역사상 평균 대비 '+stats.diff.toFixed(1)+'%p 높은 수준으로, 저평가 판단을 강화하는 신호입니다.';
+    if (belowAvg) return '다만 이 단지의 전세가율은 역사상 평균 대비 '+Math.abs(stats.diff).toFixed(1)+'%p 낮은 수준이라, 저평가 판단과는 엇갈리며 이를 다소 약화하는 신호입니다.';
+    return '이 단지의 전세가율은 역사상 평균 범위 안에 있어, 판단에 큰 영향을 주지는 않습니다.';
+  }
+  if (aboveAvg) return '참고로 이 단지의 전세가율은 역사상 평균보다 '+stats.diff.toFixed(1)+'%p 높은 편입니다.';
+  if (belowAvg) return '참고로 이 단지의 전세가율은 역사상 평균보다 '+Math.abs(stats.diff).toFixed(1)+'%p 낮은 편입니다.';
+  return '이 단지의 전세가율도 역사상 평균 범위 안에서 움직이고 있습니다.';
+}
+
+const SEOUL_GU = new Set(['강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구','동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구','용산구','은평구','종로구','중구','중랑구']);
+const MIN_SEOUL_SAMPLE = 3;
+
+let _seedRatioIndex = null;
+function seedRatioIndex(){
+  if (_seedRatioIndex) return _seedRatioIndex;
+  const seoulByYm = new Map();
+  const seoulComplexIds = new Set();
+  (window.SEED_COMPLEXES || []).forEach(s=>{
+    if (!s.district || !s.text || !SEOUL_GU.has(s.district)) return;
+    const parsed = parsePastedTable(s.text);
+    if (!parsed.rows.length) return;
+    seoulComplexIds.add(s.id);
+    parsed.rows.forEach(r=>{
+      if (r.saleMid==null || r.jeonseMid==null || r.saleMid===0) return;
+      const ratio = r.jeonseMid/r.saleMid*100;
+      if (!seoulByYm.has(r.ym)) seoulByYm.set(r.ym, []);
+      seoulByYm.get(r.ym).push(ratio);
+    });
+  });
+  _seedRatioIndex = { seoulByYm, seoulComplexIds };
+  return _seedRatioIndex;
+}
+function avgArr(arr){ return arr && arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+function seoulHistoricalAvg(){
+  const idx = seedRatioIndex();
+  const count = idx.seoulComplexIds.size;
+  if (count < MIN_SEOUL_SAMPLE) return { avg:null, count };
+  const yms = [...idx.seoulByYm.keys()].sort((a,b)=>a-b);
+  return { avg: yearlyAvg(yms, ym => avgArr(idx.seoulByYm.get(ym))), count };
+}
+
+const BENCHMARK_BASE_YM = 201306;
+const BENCHMARK_GROUPS = {
+  seoul: {
+    label: '서울 일반 벤치마크',
+    members: ['잠실엘스','리센츠','파크리오','트리지움','래미안퍼스티지','반포자이','도곡렉슬','대치아이파크','북한산I-PARK','고덕아이파크','래미안옥수리버젠','삼성래미안트리베라(2차)','신도림2차동아','강동롯데캐슬퍼스트','영등포푸르지오','남산타운','우장산아이파크e편한세상','마포래미안푸르지오','문래자이']
+  },
+  rebuild: {
+    label: '재건축 벤치마크',
+    members: ['현대(1,2차)','은마','잠실주공(5단지)','장미(1차)','장미(2차)','시범','한강맨션.','신반포(한신2차)','아시아선수촌','개포주공6단지','목동신시가지(7단지)','목동신시가지(9단지)','목동신시가지(10단지)','목동신시가지(13단지)','목동신시가지(14단지)','삼풍','올림픽선수기자촌','성산시영','한보미도맨션','삼익그린맨션(2차)']
+  }
+};
+
+function findLibraryComplexByName(name){
+  const entry = state.library.find(x=>x.name===name) || (window.SEED_COMPLEXES||[]).find(x=>x.name===name);
+  if (!entry || !entry.text) return null;
+  return buildComplex(entry.text, entry.name, entry.name);
+}
+
+// KB부동산은 최신월(특히 당월)일수록 아직 시세를 갱신한 단지 수가 적어,
+// 벤치마크 그룹 평균이 소수 단지 값에 좌우되어 급락/급등하는 것처럼 보이는
+// 왜곡이 생긴다. 그 달에 값을 낸 단지가 그룹의 절반(50%) 미만이면 새로
+// 평균을 내지 않고 직전에 정상적으로 계산된 값을 그대로 이어간다 — 절반이면
+// "표본이 그룹을 대표한다"는 최소한의 기준으로 판단했다.
+const MIN_GROUP_SAMPLE_RATIO = 0.5;
+function applySampleFloor(perYmArrays, totalMembers){
+  const yms = [...perYmArrays.keys()].sort((a,b)=>a-b);
+  const minCount = Math.max(1, Math.ceil(totalMembers * MIN_GROUP_SAMPLE_RATIO));
+  const series = new Map();
+  const carriedYms = new Set();
+  let last = null;
+  yms.forEach(ym=>{
+    const arr = perYmArrays.get(ym);
+    if (arr.length >= minCount){
+      last = arr.reduce((a,b)=>a+b,0)/arr.length;
+      series.set(ym, last);
+    } else if (last!=null){
+      series.set(ym, last);
+      carriedYms.add(ym);
+    }
+  });
+  return { series, carriedYms };
+}
+
+const VIRTUAL_BASE_FIELDS = ['saleLow','saleMid','saleHigh','jeonseLow','jeonseMid','jeonseHigh'];
+function buildGroupRawPriceSeries(names, field){
+  const perYm = new Map();
+  names.forEach(name=>{
+    const c = findLibraryComplexByName(name);
+    if (!c) return;
+    c.rows.forEach(r=>{
+      if (r[field]==null) return;
+      if (!perYm.has(r.ym)) perYm.set(r.ym, []);
+      perYm.get(r.ym).push(r[field]);
+    });
+  });
+  return applySampleFloor(perYm, names.length);
+}
+let _virtualBenchmarkCache = {};
+function getVirtualBenchmarkComplex(groupKey){
+  if (_virtualBenchmarkCache[groupKey]) return _virtualBenchmarkCache[groupKey];
+  const members = BENCHMARK_GROUPS[groupKey].members;
+  const seriesByField = {};
+  VIRTUAL_BASE_FIELDS.forEach(f => { seriesByField[f] = buildGroupRawPriceSeries(members, f); });
+  const allYms = new Set();
+  VIRTUAL_BASE_FIELDS.forEach(f => seriesByField[f].series.forEach((v,ym)=>allYms.add(ym)));
+  const yms = [...allYms].sort((a,b)=>a-b);
+  const rows = yms.map(ym=>{
+    const row = { ym };
+    VIRTUAL_BASE_FIELDS.forEach(f => { row[f] = seriesByField[f].series.has(ym) ? seriesByField[f].series.get(ym) : null; });
+    return row;
+  });
+  const rowMap = new Map(rows.map(r=>[r.ym, r]));
+  const name = BENCHMARK_GROUPS[groupKey].label;
+  const carriedYms = new Set([...seriesByField.saleMid.carriedYms, ...seriesByField.jeonseMid.carriedYms]);
+  const result = { name, rows, rowMap, parsedName: name, isVirtualBenchmark: true, groupKey, carriedYms };
+  _virtualBenchmarkCache[groupKey] = result;
+  return result;
+}
+const VIRTUAL_BASE_LATE_JOIN_MONTHS = 60; // 그룹 시작보다 5년 이상 늦게 데이터가 시작되는 단지만 별도 안내
+function virtualBenchmarkPartialNotes(groupKey){
+  // 그룹 구성원 대부분보다 데이터 시작 시점이 뚜렷이(5년 이상) 늦은 단지만
+  // "이 단지는 YYYY.MM 이후부터 반영됩니다" 안내로 표시한다. 몇 달 차이는
+  // 흔한 데이터 편차라 전부 나열하면 오히려 안내 문구가 무의미해진다.
+  const members = BENCHMARK_GROUPS[groupKey].members;
+  const virtual = getVirtualBenchmarkComplex(groupKey);
+  if (!virtual.rows.length) return [];
+  const groupFirstYm = virtual.rows[0].ym;
+  const notes = [];
+  members.forEach(name=>{
+    const c = findLibraryComplexByName(name);
+    if (!c || !c.rows.length) return;
+    const firstYm = c.rows[0].ym;
+    if (ymIndex(firstYm) - ymIndex(groupFirstYm) >= VIRTUAL_BASE_LATE_JOIN_MONTHS){
+      notes.push(name+'은(는) '+fmtYm(firstYm)+' 이후부터 반영됩니다');
+    }
+  });
+  return notes;
+}
+
+function buildGroupPriceIndex(names, field){
+  const perComplex = [];
+  names.forEach(name=>{
+    const c = findLibraryComplexByName(name);
+    if (!c) return;
+    const baseRow = c.rowMap.get(BENCHMARK_BASE_YM);
+    const baseVal = baseRow ? baseRow[field] : null;
+    if (baseVal==null) return;
+    const map = new Map();
+    c.rows.forEach(r=>{ if (r[field]!=null) map.set(r.ym, r[field]/baseVal*100); });
+    perComplex.push({ name, map });
+  });
+  const perYm = new Map();
+  perComplex.forEach(p=>p.map.forEach((v,ym)=>{
+    if (!perYm.has(ym)) perYm.set(ym, []);
+    perYm.get(ym).push(v);
+  }));
+  const { series, carriedYms } = applySampleFloor(perYm, perComplex.length);
+  return { series, memberCount: perComplex.length, includedNames: perComplex.map(p=>p.name), carriedYms };
+}
+
+function buildGroupRatioAvg(names){
+  // 그룹 전세가율 라인 자체는 참고용 통계로 항상 전체 구성 단지 평균을 보여준다
+  // (28년차 이상 예외 규칙은 "그룹 지수를 개별 단지 진단 근거로 쓰지 않는다"는
+  // 해석 제한이지, 통계 표시 자체를 막는 것은 아니다 — 그렇게 하면 재건축
+  // 그룹처럼 구성원 대부분이 28년차 이상인 경우 라인이 통째로 비어버린다).
+  const perYm = new Map();
+  let memberCount = 0;
+  const excludedForAge = [];
+  names.forEach(name=>{
+    const c = findLibraryComplexByName(name);
+    if (!c) return;
+    memberCount++;
+    const eligibility = jeonseRatioDiagnosisEligible(findBuiltYear(name), computeSelfRatioStats(c), state.threshold);
+    if (!eligibility.eligible) excludedForAge.push(name);
+    c.rows.forEach(r=>{
+      if (r.saleMid==null || r.jeonseMid==null || r.saleMid===0) return;
+      const ratio = r.jeonseMid/r.saleMid*100;
+      if (!perYm.has(r.ym)) perYm.set(r.ym, []);
+      perYm.get(r.ym).push(ratio);
+    });
+  });
+  const { series, carriedYms } = applySampleFloor(perYm, memberCount);
+  return { series, memberCount, excludedForAge, carriedYms };
+}
+
+let _benchmarkCache = null;
+function computeBenchmarkGroups(){
+  if (_benchmarkCache) return _benchmarkCache;
+  _benchmarkCache = {};
+  Object.keys(BENCHMARK_GROUPS).forEach(key=>{
+    const members = BENCHMARK_GROUPS[key].members;
+    _benchmarkCache[key] = {
+      label: BENCHMARK_GROUPS[key].label,
+      sale: buildGroupPriceIndex(members, 'saleMid'),
+      jeonse: buildGroupPriceIndex(members, 'jeonseMid'),
+      ratio: buildGroupRatioAvg(members)
+    };
+  });
+  return _benchmarkCache;
+}
+
+function seriesAllTimeHighYm(series){
+  let bestYm = null, bestVal = null;
+  series.forEach((v,ym)=>{ if (v!=null && (bestVal==null || v>bestVal)){ bestVal=v; bestYm=ym; } });
+  return { ym: bestYm, val: bestVal };
+}
+
+function computeDecoupling(complex, groupKey, field){
+  const groups = computeBenchmarkGroups();
+  const group = groups[groupKey][field==='saleMid' ? 'sale' : 'jeonse'];
+  const baseRow = complex.rowMap.get(BENCHMARK_BASE_YM);
+  const baseVal = baseRow ? baseRow[field] : null;
+  if (baseVal==null) return { error: '이 단지는 기준시점(2013.06) 데이터가 없어 벤치마크와 비교할 수 없습니다.' };
+  const commonYms = [...group.series.keys()].filter(ym=>{
+    const r = complex.rowMap.get(ym);
+    return r && r[field]!=null;
+  }).sort((a,b)=>a-b);
+  if (!commonYms.length) return { error: '벤치마크 그룹과 공통 구간이 없습니다.' };
+  const multAt = (ym) => (complex.rowMap.get(ym)[field]/baseVal*100) / group.series.get(ym) * 100;
+  const avgMult = yearlyAvg(commonYms, multAt);
+  const curYm = commonYms[commonYms.length-1];
+  const curMult = multAt(curYm);
+  const diff = (avgMult!=null) ? curMult-avgMult : null;
+
+  const benchAth = seriesAllTimeHighYm(group.series);
+  let indivAth = null, indivAthYm = null;
+  commonYms.forEach(ym=>{
+    const v = complex.rowMap.get(ym)[field];
+    if (v!=null && (indivAth==null || v>indivAth)){ indivAth=v; indivAthYm=ym; }
+  });
+  const benchRecovery = (benchAth.val!=null) ? group.series.get(curYm)/benchAth.val*100 : null;
+  const indivRecovery = (indivAth!=null) ? complex.rowMap.get(curYm)[field]/indivAth*100 : null;
+  const recoveryGap = (benchRecovery!=null && indivRecovery!=null) ? indivRecovery-benchRecovery : null;
+
+  return {
+    curYm, curMult, avgMult, diff,
+    benchAthYm: benchAth.ym, indivAthYm, benchRecovery, indivRecovery, recoveryGap
+  };
+}
+
+function selfRatioSeries(complex){
+  const yms = [];
+  const map = new Map();
+  complex.rows.forEach(r=>{
+    if (r.saleMid==null || r.jeonseMid==null || r.saleMid===0) return;
+    const ratio = r.jeonseMid/r.saleMid*100;
+    yms.push(r.ym);
+    map.set(r.ym, ratio);
+  });
+  return { yms, map };
+}
+function computeSelfRatioStats(complex){
+  const { yms, map } = selfRatioSeries(complex);
+  if (!yms.length) return null;
+  let maxYm=null, maxVal=-Infinity, minYm=null, minVal=Infinity;
+  yms.forEach(ym=>{
+    const v = map.get(ym);
+    if (v>maxVal){ maxVal=v; maxYm=ym; }
+    if (v<minVal){ minVal=v; minYm=ym; }
+  });
+  const avg = yearlyAvg(yms, ym=>map.get(ym));
+  const curYm = yms[yms.length-1];
+  const cur = map.get(curYm);
+  const diff = (avg!=null && cur!=null) ? cur-avg : null;
+  return { maxYm, maxVal, minYm, minVal, avg, curYm, cur, diff };
+}
+function jeonseRatioInterpretation(diff, threshold){
+  if (diff==null) return { badge:'데이터 부족', tone:'neutral', message:'평균을 계산할 데이터가 부족합니다.' };
+  if (diff >= threshold) return { badge:'저평가 방향', tone:'good', message:'현재 전세가율이 과거 평균보다 뚜렷이 높습니다. 전세가 대비 매매가가 상대적으로 눌려 있어, 매매가가 저평가된 국면일 가능성이 있습니다.' };
+  if (diff <= -threshold) return { badge:'고평가 방향', tone:'bad', message:'현재 전세가율이 과거 평균보다 뚜렷이 낮습니다. 전세가 대비 매매가가 많이 올라 있어, 매매가가 고평가된 국면일 가능성이 있습니다.' };
+  return { badge:'평균 범위', tone:'neutral', message:'현재 전세가율이 과거 평균 범위 안에서 움직이고 있습니다.' };
+}
+
+const REBUILD_AGE_THRESHOLD = 28;
+
+function findBuiltYear(name){
+  // state.library entries only carry id/name/text (see loadState) — builtYear
+  // metadata lives solely on window.SEED_COMPLEXES, so look there directly.
+  const entry = (window.SEED_COMPLEXES||[]).find(x=>x.name===name);
+  return entry ? entry.builtYear : null;
+}
+function complexAge(builtYear){
+  if (builtYear==null) return null;
+  return new Date().getFullYear() - builtYear;
+}
+function seoulCurrentRatio(){
+  const idx = seedRatioIndex();
+  const yms = [...idx.seoulByYm.keys()].sort((a,b)=>a-b);
+  if (!yms.length) return null;
+  return avgArr(idx.seoulByYm.get(yms[yms.length-1]));
+}
+function jeonseRatioDiagnosisEligible(builtYear, stats, threshold){
+  const age = complexAge(builtYear);
+  if (age==null || age < REBUILD_AGE_THRESHOLD) return { eligible:true };
+  if (!stats || stats.cur==null) return { eligible:true };
+  const seoulCur = seoulCurrentRatio();
+  const conditionA = seoulCur!=null && (stats.cur - seoulCur) >= -5;
+  const conditionB = stats.diff!=null && Math.abs(stats.diff) < threshold;
+  if (conditionA || conditionB){
+    return { eligible:true, note:'재건축 기대감이 낮아 전세가율이 정상적으로 매매가에 연동되는 단지로 판단됩니다.' };
+  }
+  return { eligible:false, reason:'재건축 연한 근접('+age+'년차), 전세가율이 판단 지표로서 의미가 낮습니다.' };
+}
+
+const state = {
+  threshold: 3,
+  period: 'all',
+  basePreset: 'els',
+  baseText: '',
+  baseName: '',
+  compares: Array.from({length:MAX_SLOTS}, (_,i)=>({ text:'', name:'', visible: true })),
+  activeSlot: 0,
+  activeChart: 'sale',
+  overlaySlot: null,
+  multiSlot: null,
+  ratioPeakOn: false,
+  ratioTroughOn: false,
+  ratioAvgOn: false,
+  refComplexName: '',
+  benchmarkChoice: {},
+  benchmarkOverlayOn: true,
+  benchmarkOverlayGroup: 'seoul',
+  benchFairOn: false,
+  library: [],
+  fairLineOverride: null,
+  gasUrl: ''
+};
+let usingSeed = false;
+
+function normalizeCompares(){
+  const arr = Array.isArray(state.compares) ? state.compares : [];
+  const out = [];
+  for (let i=0;i<MAX_SLOTS;i++){
+    const existing = arr[i] || {};
+    out.push({
+      text: existing.text || '',
+      name: existing.name || '',
+      visible: existing.visible!=null ? existing.visible : true
+    });
+  }
+  state.compares = out;
+}
+function migrateLibraryIds(){
+  const existingIds = new Set(state.library.filter(e=>e.id).map(e=>e.id));
+  let changed = false;
+  state.library.forEach(entry => {
+    if (!entry.id){
+      const baseId = window.SharedLib.slugify(entry.name || 'complex');
+      entry.id = window.SharedLib.ensureUniqueId(baseId, existingIds);
+      existingIds.add(entry.id);
+      changed = true;
+    }
+  });
+  if (changed) saveState();
+}
+
+function loadState(){
+  let raw = null;
+  try { raw = localStorage.getItem(STORE_KEY); } catch(e){}
+  if (raw){
+    try {
+      const saved = JSON.parse(raw);
+      Object.assign(state, saved);
+      if (!state.gasUrl && window.SHARED_LIBRARY_URL) state.gasUrl = window.SHARED_LIBRARY_URL;
+      normalizeCompares();
+      migrateLibraryIds();
+      return;
+    } catch(e){}
+  }
+  usingSeed = true;
+  const seeds = window.SEED_COMPLEXES || [];
+  const defaults = window.SEED_DEFAULT || {};
+  state.library = seeds.map(s=>({ id:s.id, name:s.name, text:s.text, savedAt:new Date().toISOString() }));
+  const baseSeed = seeds.find(s=>s.name===defaults.base) || seeds[0];
+  const compSeed = seeds.find(s=>s.name===defaults.compare1) || seeds[1];
+  if (baseSeed){ state.baseText = baseSeed.text; state.basePreset = 'els'; }
+  if (compSeed){ state.compares[0].text = compSeed.text; state.compares[0].name = compSeed.name; }
+  if (window.SHARED_LIBRARY_URL) state.gasUrl = window.SHARED_LIBRARY_URL;
+  normalizeCompares();
+  migrateLibraryIds();
+}
+function saveState(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch(e){}
+}
+
+function computeSlot(base, comp){
+  if (!base.rows.length || !comp.rows.length) return { error:'데이터 없음' };
+  const full = commonYms(base.rowMap, comp.rowMap);
+  if (!full.length) return { error:'공통 구간 없음' };
+  const filtered = periodFilter(full, state.period);
+
+  const saleYms = filtered.filter(ym => base.rowMap.get(ym).saleMid!=null && comp.rowMap.get(ym).saleMid!=null);
+  const jeonseYms = filtered.filter(ym => base.rowMap.get(ym).jeonseMid!=null && comp.rowMap.get(ym).jeonseMid!=null);
+  const avgSaleRatio = yearlyAvg(saleYms, ym => comp.rowMap.get(ym).saleMid/base.rowMap.get(ym).saleMid*100);
+  const avgJeonseRatio = yearlyAvg(jeonseYms, ym => comp.rowMap.get(ym).jeonseMid/base.rowMap.get(ym).jeonseMid*100);
+
+  const curSale = latestWithField(full, base.rowMap, comp.rowMap, 'saleMid', 'saleMid');
+  const curJeonse = latestWithField(full, base.rowMap, comp.rowMap, 'jeonseMid', 'jeonseMid');
+
+  const currentSaleRatio = curSale ? curSale.c/curSale.b*100 : null;
+  const currentJeonseRatio = curJeonse ? curJeonse.c/curJeonse.b*100 : null;
+  const saleDiff = (currentSaleRatio!=null && avgSaleRatio!=null) ? currentSaleRatio-avgSaleRatio : null;
+  const jeonseDiff = (currentJeonseRatio!=null && avgJeonseRatio!=null) ? currentJeonseRatio-avgJeonseRatio : null;
+
+  const fairSale = (curSale && avgSaleRatio!=null) ? curSale.b*avgSaleRatio/100 : null;
+  const fairJeonse = (curJeonse && avgJeonseRatio!=null) ? curJeonse.b*avgJeonseRatio/100 : null;
+  const saleGap = (fairSale!=null && curSale) ? fairSale-curSale.c : null;
+  const jeonseGap = (fairJeonse!=null && curJeonse) ? fairJeonse-curJeonse.c : null;
+
+  const diag = diagnose(saleDiff, jeonseDiff, state.threshold);
+
+  const saleSeries = full.map(ym => (base.rowMap.get(ym).saleMid!=null && comp.rowMap.get(ym).saleMid!=null) ? comp.rowMap.get(ym).saleMid/base.rowMap.get(ym).saleMid*100 : null);
+  const jeonseSeries = full.map(ym => (base.rowMap.get(ym).jeonseMid!=null && comp.rowMap.get(ym).jeonseMid!=null) ? comp.rowMap.get(ym).jeonseMid/base.rowMap.get(ym).jeonseMid*100 : null);
+
+  return {
+    fullYms: full, filteredYms: filtered,
+    avgSaleRatio, avgJeonseRatio, currentSaleRatio, currentJeonseRatio,
+    saleDiff, jeonseDiff, saleGap, jeonseGap,
+    curSaleYm: curSale ? curSale.ym : null, curJeonseYm: curJeonse ? curJeonse.ym : null,
+    diag, saleSeries, jeonseSeries
+  };
+}
+
+const SYNC_LOW_RANGE = [201207, 201306];
+const SYNC_HIGH_RANGE = [202107, 202206];
+const SYNC_TOOLTIP = '동조율은 과거 저점~고점 구간에서 이 단지가 기준단지 상승폭을 얼마나 따라왔는지를 보여줍니다. 동조율이 높으면 현재 저평가 상태일 때 갭을 빠르게 메울 가능성이 크고, 낮으면 원래 상승 여력이 상대적으로 약해 갭 메우기가 더딜 수 있습니다.';
+
+function findExtremeInRange(rowMap, field, range, mode){
+  let bestYm = null, bestVal = null;
+  rowMap.forEach((row, ym) => {
+    if (ym < range[0] || ym > range[1]) return;
+    const v = row[field];
+    if (v == null) return;
+    if (bestVal == null || (mode==='min' ? v < bestVal : v > bestVal)){ bestVal = v; bestYm = ym; }
+  });
+  return bestYm != null ? { ym: bestYm, val: bestVal } : null;
+}
+function computeCycleRise(rowMap){
+  const low = findExtremeInRange(rowMap, 'saleMid', SYNC_LOW_RANGE, 'min');
+  const high = findExtremeInRange(rowMap, 'saleMid', SYNC_HIGH_RANGE, 'max');
+  if (!low || !high || low.val===0) return null;
+  return { low, high, rise: (high.val-low.val)/low.val*100 };
+}
+function syncTier(rate){
+  if (rate==null) return null;
+  if (rate >= 85) return 'high';
+  if (rate < 75) return 'low';
+  return 'mid';
+}
+const SYNC_TIER_LABEL = { high:'동조율 높음', mid:'동조율 보통', low:'동조율 낮음' };
+function computeSyncRate(base, comp){
+  const baseCycle = computeCycleRise(base.rowMap);
+  const compCycle = computeCycleRise(comp.rowMap);
+  if (!baseCycle || !compCycle || baseCycle.rise===0) return null;
+  const rate = compCycle.rise / baseCycle.rise * 100;
+  return { baseCycle, compCycle, rate, tier: syncTier(rate) };
+}
+const SYNC_INTERPRETATION = {
+  '저평가': {
+    high: '과거에는 기준단지 흐름을 잘 따라왔으나 현재는 배율이 낮아진 상태입니다. 곧 갭 메우기에 들어갈 가능성이 높습니다.',
+    mid: '과거 흐름을 어느 정도 따라왔고 현재는 배율이 낮아진 상태입니다. 갭이 메워질 여지는 있지만 속도는 지켜볼 필요가 있습니다.',
+    low: '현재도 기준단지를 잘 따라오지 못하고 있고, 과거에도 비슷한 배율로 움직이지 않았습니다. 이번 사이클이 끝나도 평균 배율을 회복하지 못하고 낮은 수준에 머물 수 있습니다.'
+  },
+  '고평가': {
+    high: '과거 흐름대로 강하게 반응해 현재 배율이 높아진 상태입니다. 일시적 과열일 가능성을 함께 고려해야 합니다.',
+    mid: '과거보다 다소 높은 배율까지 올라온 상태입니다. 최근 상승이 흐름 안에서의 정상적 확장인지 지켜볼 필요가 있습니다.',
+    low: '원래 기준단지를 잘 따라오지 못하던 단지가 일시적으로 급등한 상태일 수 있습니다. 입지·위상의 변화가 있었는지 확인하고, 지속 가능성을 지켜볼 필요가 있습니다.'
+  },
+  '적정': {
+    high: '과거에도 기준단지 흐름을 잘 따라왔고 지금도 그 배율을 유지하고 있어, 안정적으로 동행하는 단지입니다.',
+    mid: '과거 흐름을 어느 정도 따라오며 현재도 평균 범위 안에서 움직이고 있습니다.',
+    low: '과거에는 기준단지를 잘 따라오지 못했지만 현재는 평균 범위 안에 있습니다. 독립적인 가격 흐름을 가진 단지일 수 있습니다.'
+  }
+};
+function syncInterpretation(badge, tier){
+  if (!tier) return null;
+  const group = SYNC_INTERPRETATION[badge];
+  return group ? (group[tier] || null) : null;
+}
+
+function getBaseComplex(){
+  if (state.basePreset==='benchmark-seoul') return getVirtualBenchmarkComplex('seoul');
+  if (state.basePreset==='benchmark-rebuild') return getVirtualBenchmarkComplex('rebuild');
+  const fallback = state.basePreset==='eunma' ? '은마아파트' : state.basePreset==='els' ? '잠실엘스' : '기준단지';
+  return buildComplex(state.baseText, state.baseName, fallback);
+}
+function getCompareComplex(i){
+  const s = state.compares[i];
+  return buildComplex(s.text, s.name, '비교단지 '+(i+1));
+}
+
+let charts = {};
+function destroyChart(id){ if (charts[id]){ charts[id].destroy(); delete charts[id]; } }
+
+function render(){
+  const base = getBaseComplex();
+  document.getElementById('baseName').value = state.baseName;
+  document.getElementById('basePreset').value = state.basePreset;
+  document.getElementById('baseText').value = state.baseText;
+  document.getElementById('thresholdInput').value = state.threshold;
+  document.getElementById('gasUrlInput').value = state.gasUrl || '';
+  document.querySelectorAll('#periodSeg button').forEach(b=>b.classList.toggle('active', b.dataset.period===state.period));
+
+  refreshLibraryUI();
+  refreshGasStatus();
+  renderBaseStatus(base);
+  renderCompareTabs(base);
+  renderSummaryCards(base);
+  renderRefCompareSection(base);
+  renderSummaryTable(base);
+  renderChartTabs();
+  renderActiveChart(base);
+}
+
+function renderBaseStatus(base){
+  const el = document.getElementById('baseStatus');
+  if (!base.rows.length){
+    el.className = 'status-line';
+    el.innerHTML = '<span class="dot"></span><span>데이터를 붙여넣어주세요</span>';
+    return;
+  }
+  el.className = 'status-line ok';
+  const seedTag = usingSeed ? '<span class="seed-badge">예시</span>' : '';
+  const groupTag = base.isVirtualBenchmark ? '<span class="seed-badge">그룹 평균</span>' : '';
+  el.innerHTML = '<span class="dot"></span><span>'+base.rows.length+'개월 · '+fmtYm(base.rows[0].ym)+'~'+fmtYm(base.rows[base.rows.length-1].ym)+'</span>'+seedTag+groupTag;
+  if (base.isVirtualBenchmark){
+    const notes = virtualBenchmarkPartialNotes(base.groupKey);
+    if (notes.length){
+      let noteEl = document.getElementById('baseVirtualNote');
+      if (!noteEl){
+        noteEl = document.createElement('div');
+        noteEl.id = 'baseVirtualNote';
+        noteEl.className = 'common-range';
+        el.insertAdjacentElement('afterend', noteEl);
+      }
+      noteEl.textContent = notes.join(' · ');
+    } else {
+      const existing = document.getElementById('baseVirtualNote');
+      if (existing) existing.remove();
+    }
+  } else {
+    const existing = document.getElementById('baseVirtualNote');
+    if (existing) existing.remove();
+  }
+}
+
+function renderCompareTabs(base){
+  const tabsEl = document.getElementById('compareTabs');
+  const slotsEl = document.getElementById('compareSlots');
+  tabsEl.innerHTML = '';
+  slotsEl.innerHTML = '';
+  for (let i=0;i<MAX_SLOTS;i++){
+    const comp = getCompareComplex(i);
+    const label = comp.parsedName || (comp.rows.length ? comp.name : (i+1)+'');
+    const tab = document.createElement('button');
+    tab.className = 'tab-btn'+(state.activeSlot===i?' active':'')+(comp.rows.length && !state.compares[i].visible ? ' dim':'');
+    tab.innerHTML = '<span class="swatch" style="background:var('+SLOT_COLORS[i]+')"></span>'+label;
+    tab.addEventListener('click', ()=>{ state.activeSlot=i; render(); });
+    tabsEl.appendChild(tab);
+
+    const panel = document.createElement('div');
+    panel.className = 'slot-panel'+(state.activeSlot===i?' active':'');
+    const seedTag = (usingSeed && i===0) ? '<span class="seed-badge">예시</span>' : '';
+    panel.innerHTML =
+      '<div class="slot-head">'+
+        '<input class="textish name-input" data-role="name" placeholder="비교단지 '+(i+1)+' 단지명" value="'+(state.compares[i].name||'').replace(/"/g,'&quot;')+'">'+
+        '<button class="clear-link" data-role="makeBase" title="이 단지를 기준단지로 전환">⇄ 기준단지로</button>'+
+        '<button class="clear-link" data-role="clear">비우기</button>'+
+      '</div>'+
+      '<label class="visible-check">'+
+        '<input type="checkbox" data-role="visible"'+(state.compares[i].visible?' checked':'')+'>'+
+        '<span>그래프에 표시</span>'+
+      '</label>'+
+      '<div class="lib-row">'+
+        '<select data-role="lib"><option value="">라이브러리에서 불러오기...</option></select>'+
+      '</div>'+
+      '<div class="lib-row">'+
+        '<button class="btn small upload-btn" data-role="upload">📂 엑셀 파일로 단지 넣기</button>'+
+        '<input type="file" data-role="uploadInput" accept=".xlsx,.xls" multiple hidden>'+
+      '</div>'+
+      '<div class="status-line'+(comp.rows.length?' ok':'')+'">'+
+        '<span class="dot"></span><span>'+(comp.rows.length ? comp.rows.length+'개월 · '+fmtYm(comp.rows[0].ym)+'~'+fmtYm(comp.rows[comp.rows.length-1].ym) : '데이터 없음')+'</span>'+seedTag+
+      '</div>'+
+      '<div class="common-range" data-role="common"></div>'+
+      '<details class="raw-toggle">'+
+        '<summary>직접 붙여넣기 (고급)</summary>'+
+        '<textarea data-role="text" placeholder="비교단지 원자료를 붙여넣으세요">'+ (state.compares[i].text||'') +'</textarea>'+
+        '<div class="lib-row">'+
+          '<button class="btn small" data-role="libsave">라이브러리에 저장</button>'+
+        '</div>'+
+      '</details>';
+    slotsEl.appendChild(panel);
+    renderLibraryOptions(panel.querySelector('[data-role=lib]'));
+
+    if (base.rows.length && comp.rows.length){
+      const common = commonYms(base.rowMap, comp.rowMap);
+      const rangeEl = panel.querySelector('[data-role=common]');
+      rangeEl.textContent = common.length
+        ? '공통구간: '+fmtYm(common[0])+'~'+fmtYm(common[common.length-1])+' ('+common.length+'개월)'
+        : '기준단지와 겹치는 구간이 없습니다.';
+    }
+
+    panel.querySelector('[data-role=text]').addEventListener('input', (e)=>{
+      state.compares[i].text = e.target.value;
+      state.compares[i].visible = true;
+      if (i===0) usingSeed = false;
+      saveState(); debounceRender();
+    });
+    panel.querySelector('[data-role=name]').addEventListener('input', (e)=>{
+      state.compares[i].name = e.target.value; saveState(); debounceRender();
+    });
+    panel.querySelector('[data-role=makeBase]').addEventListener('click', ()=>{
+      if (!state.compares[i].text){ alert('먼저 비교단지 데이터를 입력하세요.'); return; }
+      const oldBaseText = state.baseText;
+      const oldBaseName = state.baseName;
+      state.baseText = state.compares[i].text;
+      state.baseName = state.compares[i].name;
+      state.compares[i] = { text: oldBaseText, name: oldBaseName, visible: true };
+      usingSeed = false;
+      saveState(); render();
+    });
+    panel.querySelector('[data-role=clear]').addEventListener('click', ()=>{
+      state.compares[i].text=''; state.compares[i].name='';
+      if (i===0) usingSeed = false;
+      saveState(); render();
+    });
+    panel.querySelector('[data-role=visible]').addEventListener('change', (e)=>{
+      state.compares[i].visible = e.target.checked;
+      saveState(); render();
+    });
+    panel.querySelector('[data-role=lib]').addEventListener('change', (e)=>{
+      const entry = state.library.find(x=>x.name===e.target.value);
+      if (!entry) return;
+      state.compares[i].text = entry.text; state.compares[i].name = entry.name; state.compares[i].visible = true;
+      if (i===0) usingSeed = false;
+      saveState(); render();
+    });
+    panel.querySelector('[data-role=libsave]').addEventListener('click', ()=>{
+      saveToLibrary(state.compares[i].name || comp.parsedName, state.compares[i].text);
+    });
+    wireUploadButton(panel.querySelector('[data-role=upload]'), panel.querySelector('[data-role=uploadInput]'), (results)=>{
+      const targets = [i];
+      for (let s=0; s<MAX_SLOTS && targets.length<results.length; s++){
+        if (s!==i && !state.compares[s].text) targets.push(s);
+      }
+      const saved = [];
+      results.forEach((r, idx)=>{
+        if (idx>=targets.length) return;
+        const slotIdx = targets[idx];
+        state.compares[slotIdx].text = r.text;
+        state.compares[slotIdx].name = r.name;
+        state.compares[slotIdx].visible = true;
+        if (slotIdx===0) usingSeed = false;
+        saveToLibrary(r.name, r.text, {silent: results.length>1});
+        saved.push(r.name);
+      });
+      saveState(); render();
+      if (results.length>1){
+        let msg = saved.length+'개 단지를 불러왔습니다: '+saved.join(', ');
+        if (results.length>targets.length) msg += '\n(빈 슬롯이 부족해 '+(results.length-targets.length)+'개는 넣지 못했습니다)';
+        alert(msg);
+      }
+    });
+  }
+}
+
+function renderLibraryOptions(selectEl, currentValue){
+  if (!selectEl) return;
+  const cur = currentValue!=null ? currentValue : selectEl.value;
+  selectEl.innerHTML = '<option value="">라이브러리에서 불러오기...</option>'+
+    state.library.map(e=>'<option value="'+esc(e.name)+'">'+esc(e.name)+' ('+parsePastedTable(e.text).rows.length+'개월)'+(e.shared?' · 공용':'')+'</option>').join('');
+  selectEl.value = cur && state.library.some(e=>e.name===cur) ? cur : '';
+}
+
+function refreshLibraryUI(){
+  document.getElementById('libCount').textContent = state.library.length;
+  renderLibraryOptions(document.getElementById('baseLibSelect'));
+  renderRefComplexOptions();
+}
+
+function renderRefComplexOptions(){
+  const selectEl = document.getElementById('refComplexSelect');
+  if (!selectEl) return;
+  selectEl.innerHTML = '<option value="">선택 안 함</option>'+
+    state.library.map(e=>'<option value="'+esc(e.name)+'">'+esc(e.name)+' ('+parsePastedTable(e.text).rows.length+'개월)'+'</option>').join('');
+  selectEl.value = state.refComplexName && state.library.some(e=>e.name===state.refComplexName) ? state.refComplexName : '';
+}
+
+function refreshGasStatus(){
+  const el = document.getElementById('gasStatus');
+  if (!el) return;
+  if (!state.gasUrl){
+    el.className = 'status-line';
+    el.innerHTML = '<span class="dot"></span><span>설정되지 않음 (로컬 저장만 사용)</span>';
+  }
+}
+
+function saveToLibrary(name, text, opts){
+  opts = opts || {};
+  const key = (name||'').trim();
+  if (!key){ if (!opts.silent) alert('저장하기 전에 단지명을 입력해주세요.'); return false; }
+  const parsed = parsePastedTable(text);
+  if (!parsed.rows.length){ if (!opts.silent) alert('인식된 시세 데이터가 없습니다. 원자료를 먼저 붙여넣어주세요.'); return false; }
+  const idx = state.library.findIndex(e=>e.name===key);
+  const existingId = idx>=0 ? state.library[idx].id : null;
+  const id = existingId || window.SharedLib.ensureUniqueId(
+    window.SharedLib.slugify(key),
+    new Set(state.library.filter(e=>e.id).map(e=>e.id))
+  );
+  const entry = { id, name:key, text, savedAt:new Date().toISOString() };
+  if (idx>=0) state.library[idx] = entry; else state.library.push(entry);
+  saveState();
+  refreshLibraryUI();
+  gasPushEntry(entry);
+  if (!opts.silent){
+    render();
+    alert('"'+key+'" 단지를 라이브러리에 저장했습니다. (총 '+state.library.length+'개)');
+  }
+  return true;
+}
+
+function exportLibrary(){
+  if (!state.library.length){ alert('저장된 단지가 없습니다. 먼저 "라이브러리에 저장"을 눌러주세요.'); return; }
+  const payload = { type:'benchmark-calc-library', version:1, library:state.library };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.href = url; a.download = '단지라이브러리_'+today+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importLibraryFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data && data.library) ? data.library : Array.isArray(data) ? data : null;
+      if (!incoming) throw new Error('invalid format');
+      let added=0, updated=0;
+      incoming.forEach(entry=>{
+        if (!entry || !entry.name || !entry.text) return;
+        const idx = state.library.findIndex(e=>e.name===entry.name);
+        if (idx>=0){ state.library[idx]=entry; updated++; } else { state.library.push(entry); added++; }
+      });
+      saveState();
+      refreshLibraryUI();
+      render();
+      alert('가져오기 완료: 신규 '+added+'개, 갱신 '+updated+'개 (총 '+state.library.length+'개)');
+    } catch(e){
+      alert('파일을 읽을 수 없습니다. 이 계산기에서 내보낸 JSON 파일인지 확인해주세요.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function deriveNameFromFilename(filename){
+  let base = String(filename||'').replace(/\.[^.]+$/, '');
+  base = base.replace(/\s*(과거시세|금주시세|시세변동|시세|가격|이력)\s*$/,'').trim();
+  return base;
+}
+
+function parseExcelFile(file){
+  return new Promise((resolve, reject) => {
+    if (typeof XLSX === 'undefined'){
+      reject(new Error('엑셀 파싱 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해주세요.'));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type:'array' });
+        const sheetName = wb.SheetNames.find(n=>n.indexOf('시세')!==-1) || wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const grid = XLSX.utils.sheet_to_json(ws, { header:1, raw:true, defval:'' });
+        const text = grid.map(row => row.map(cell => cell==null ? '' : String(cell)).join(',')).join('\n');
+        const parsed = parsePastedTable(text);
+        if (!parsed.rows.length){
+          reject(new Error(file.name+': 시세 데이터를 찾지 못했습니다 (KB부동산 "시세 변동" 표 형식인지 확인해주세요)'));
+          return;
+        }
+        const name = parsed.name || deriveNameFromFilename(file.name);
+        resolve({ text, name, fileName: file.name });
+      } catch(err){
+        reject(new Error(file.name+': 읽는 중 문제가 발생했습니다 (.xlsx 파일이 맞는지 확인해주세요)'));
+      }
+    };
+    reader.onerror = () => reject(new Error(file.name+': 파일을 읽지 못했습니다.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function wireUploadButton(btnEl, inputEl, onFilesLoaded){
+  if (!btnEl || !inputEl) return;
+  btnEl.addEventListener('click', ()=> inputEl.click());
+  inputEl.addEventListener('change', async (e)=>{
+    const files = Array.from(e.target.files||[]);
+    e.target.value = '';
+    if (!files.length) return;
+    const results = [];
+    const errors = [];
+    for (const file of files){
+      try { results.push(await parseExcelFile(file)); }
+      catch(err){ errors.push(err.message); }
+    }
+    if (errors.length) alert(errors.join('\n'));
+    if (results.length) onFilesLoaded(results);
+  });
+}
+
+function gasFetchList(){
+  if (!state.gasUrl) return;
+  const statusEl = document.getElementById('gasStatus');
+  statusEl.className = 'status-line';
+  statusEl.innerHTML = '<span class="dot"></span><span>불러오는 중...</span>';
+  fetch(state.gasUrl, { method:'GET' })
+    .then(r=>r.json())
+    .then(data=>{
+      const rows = Array.isArray(data) ? data : Array.isArray(data && data.rows) ? data.rows : [];
+      let added=0;
+      rows.forEach(row=>{
+        if (!row || !row.name || !row.text) return;
+        const idx = state.library.findIndex(e=>e.name===row.name);
+        const entry = { name:row.name, text:row.text, savedAt:row.savedAt||new Date().toISOString(), shared:true };
+        if (idx>=0) state.library[idx] = entry; else { state.library.push(entry); added++; }
+      });
+      saveState(); refreshLibraryUI(); render();
+      statusEl.className = 'status-line ok';
+      statusEl.innerHTML = '<span class="dot"></span><span>연결됨 · 공용 '+rows.length+'개 (신규 '+added+'개)</span>';
+    })
+    .catch(()=>{
+      statusEl.className = 'status-line bad';
+      statusEl.innerHTML = '<span class="dot"></span><span>불러오기 실패 (URL을 확인하세요)</span>';
+    });
+}
+
+function gasPushEntry(entry){
+  if (!state.gasUrl) return;
+  fetch(state.gasUrl, {
+    method:'POST',
+    headers: {'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({ name: entry.name, text: entry.text, savedAt: entry.savedAt })
+  }).catch(()=>{});
+}
+
+function toneBadge(diag){
+  return '<span class="badge '+diag.tone+'">'+diag.badge+'</span>';
+}
+
+function buildDiagCardBody(i, comp, r, sync, wide){
+  let syncHtml;
+  if (sync){
+    const interp = syncInterpretation(r.diag.badge, sync.tier);
+    syncHtml =
+      '<div class="sync-block">'+
+        '<div class="sync-head">'+
+          '<span class="k">동조율 <span class="info-icon" tabindex="0" data-tip="'+esc(SYNC_TOOLTIP)+'">ⓘ</span></span>'+
+          '<span class="sync-badge tier-'+sync.tier+'">'+sync.rate.toFixed(1)+'% · '+SYNC_TIER_LABEL[sync.tier]+'</span>'+
+        '</div>'+
+        '<div class="sync-detail">'+fmtYm(sync.compCycle.low.ym)+'(저점) → '+fmtYm(sync.compCycle.high.ym)+'(고점), '+(sync.compCycle.rise>=0?'+':'')+sync.compCycle.rise.toFixed(1)+'%</div>'+
+        (interp ? '<div class="sync-msg">'+esc(interp)+'</div>' : '')+
+      '</div>';
+  } else {
+    syncHtml =
+      '<div class="sync-block">'+
+        '<div class="sync-head">'+
+          '<span class="k">동조율 <span class="info-icon" tabindex="0" data-tip="'+esc(SYNC_TOOLTIP)+'">ⓘ</span></span>'+
+          '<span class="sync-badge tier-none">전저점~전고점 데이터 부족</span>'+
+        '</div>'+
+      '</div>';
+  }
+  const headHtml = '<div class="card-head"><span class="swatch" style="background:var('+SLOT_COLORS[i]+')"></span><span class="name">'+esc(comp.name)+'</span></div>'+toneBadge(r.diag);
+  const statsHtml =
+    '<div class="stat-row"><span class="k">매매 배율 (현재 / 평균)</span><span class="v">'+fmtPct(r.currentSaleRatio)+' / '+fmtPct(r.avgSaleRatio)+'</span></div>'+
+    '<div class="stat-row"><span class="k">매매 갭</span><span class="v '+(r.saleGap>0?'down':(r.saleGap<0?'up':''))+'">'+fmtEok(r.saleGap)+'</span></div>'+
+    '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균)</span><span class="v">'+fmtPct(r.currentJeonseRatio)+' / '+fmtPct(r.avgJeonseRatio)+'</span></div>'+
+    '<div class="stat-row"><span class="k">전세 갭</span><span class="v '+(r.jeonseGap>0?'down':(r.jeonseGap<0?'up':''))+'">'+fmtEok(r.jeonseGap)+'</span></div>';
+  const compRatioStats = computeSelfRatioStats(comp);
+  const compEligibility = jeonseRatioDiagnosisEligible(findBuiltYear(comp.name), compRatioStats, state.threshold);
+  const ratioSentence = compEligibility.eligible
+    ? jeonseRatioContextSentence(r.diag.badge, compRatioStats, state.threshold) + (compEligibility.note ? ' '+compEligibility.note : '')
+    : compEligibility.reason;
+  const msgHtml = '<div class="card-msg">'+r.diag.message+' '+ratioSentence+'</div>';
+  if (wide){
+    return '<div class="diag-wide">'+
+      '<div class="diag-wide-col">'+headHtml+statsHtml+'</div>'+
+      '<div class="diag-wide-col">'+msgHtml+syncHtml+'</div>'+
+    '</div>';
+  }
+  return headHtml+statsHtml+msgHtml+
+    syncHtml;
+}
+
+function renderSummaryCards(base){
+  const grid = document.getElementById('summaryCards');
+  grid.innerHTML = '';
+  let any = false;
+  for (let i=0;i<MAX_SLOTS;i++){
+    const comp = getCompareComplex(i);
+    if (!comp.rows.length) continue;
+    any = true;
+    const card = document.createElement('div');
+    card.className = 'card';
+    if (!base.rows.length){
+      card.innerHTML = '<div class="card-head"><span class="swatch" style="background:var('+SLOT_COLORS[i]+')"></span><span class="name">'+esc(comp.name)+'</span></div><div class="card-msg">기준단지 데이터를 먼저 입력하세요.</div>';
+      grid.appendChild(card); continue;
+    }
+    const r = computeSlot(base, comp);
+    if (r.error){
+      card.innerHTML = '<div class="card-head"><span class="swatch" style="background:var('+SLOT_COLORS[i]+')"></span><span class="name">'+esc(comp.name)+'</span></div><div class="card-msg">'+r.error+'</div>';
+      grid.appendChild(card); continue;
+    }
+    const sync = computeSyncRate(base, comp);
+    card.innerHTML = buildDiagCardBody(i, comp, r, sync);
+    grid.appendChild(card);
+  }
+  if (!any){
+    grid.innerHTML = '<div class="card empty">비교단지 데이터를 입력하면<br>진단 카드가 표시됩니다</div>';
+  }
+}
+
+function renderRefCompareSection(base){
+  const section = document.getElementById('refCompareSection');
+  const card = document.getElementById('refCompareCard');
+  const entry = state.library.find(x=>x.name===state.refComplexName);
+  if (!entry || !base.rows.length){ section.style.display = 'none'; return; }
+  const ref = buildComplex(entry.text, entry.name, entry.name);
+  if (!ref.rows.length){ section.style.display = 'none'; return; }
+  section.style.display = '';
+
+  const slot = computeSlot(base, ref);
+  const multHtml = slot.error
+    ? '<div class="card-msg">'+slot.error+' — 배율을 계산할 공통 구간이 없습니다.</div>'
+    : '<div class="stat-row"><span class="k">매매 배율 (현재 / 평균)</span><span class="v">'+fmtPct(slot.currentSaleRatio)+' / '+fmtPct(slot.avgSaleRatio)+'</span></div>'+
+      '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균)</span><span class="v">'+fmtPct(slot.currentJeonseRatio)+' / '+fmtPct(slot.avgJeonseRatio)+'</span></div>';
+
+  const baseStats = computeSelfRatioStats(base);
+  const refStats = computeSelfRatioStats(ref);
+  card.innerHTML =
+    '<div class="card-msg">기준단지 대비 준거단지("'+esc(ref.name)+'") 가격배율 (준거단지 시세 ÷ 기준단지 시세)</div>'+
+    multHtml+
+    '<div class="diag-wide" style="margin-top:8px;">'+
+      '<div class="diag-wide-col">'+ratioStatCardInner(base.name||'기준단지', '--series-base', baseStats, state.threshold)+'</div>'+
+      '<div class="diag-wide-col">'+ratioStatCardInner(ref.name, '--ink-faint', refStats, state.threshold)+'</div>'+
+    '</div>';
+}
+
+const openDiagRows = new Set();
+
+function priceWithRatioCell(price, ratio){
+  return fmtEok(price)+' <span class="cell-ratio">('+fmtPct(ratio)+')</span>';
+}
+
+function renderSummaryTable(base){
+  const tbody = document.querySelector('#summaryTable tbody');
+  tbody.innerHTML = '';
+  let any = false;
+  for (let i=0;i<MAX_SLOTS;i++){
+    const comp = getCompareComplex(i);
+    if (!comp.rows.length) continue;
+    any = true;
+    const tr = document.createElement('tr');
+    if (!base.rows.length){
+      tr.innerHTML = '<td class="name-cell"><span class="swatch" style="width:9px;height:9px;border-radius:50%;background:var('+SLOT_COLORS[i]+')"></span>'+esc(comp.name)+'</td><td colspan="7">기준단지 데이터 필요</td>';
+      tbody.appendChild(tr); continue;
+    }
+    const r = computeSlot(base, comp);
+    if (r.error){
+      tr.innerHTML = '<td class="name-cell"><span class="swatch" style="width:9px;height:9px;border-radius:50%;background:var('+SLOT_COLORS[i]+')"></span>'+esc(comp.name)+'</td><td colspan="7">'+r.error+'</td>';
+      tbody.appendChild(tr); continue;
+    }
+    const curSalePrice = r.curSaleYm!=null ? comp.rowMap.get(r.curSaleYm).saleMid : null;
+    const fairSale = (curSalePrice!=null && r.avgSaleRatio!=null) ? base.rowMap.get(r.curSaleYm).saleMid*r.avgSaleRatio/100 : null;
+    const curJeonsePrice = r.curJeonseYm!=null ? comp.rowMap.get(r.curJeonseYm).jeonseMid : null;
+    const fairJeonse = (curJeonsePrice!=null && r.avgJeonseRatio!=null) ? base.rowMap.get(r.curJeonseYm).jeonseMid*r.avgJeonseRatio/100 : null;
+    const isOpen = openDiagRows.has(i);
+    const saleCellClass = r.saleDiff==null ? '' : r.saleDiff <= -state.threshold ? ' cell-under' : r.saleDiff >= state.threshold ? ' cell-over' : '';
+    const jeonseCellClass = r.jeonseDiff==null ? '' : r.jeonseDiff <= -state.threshold ? ' cell-under' : r.jeonseDiff >= state.threshold ? ' cell-over' : '';
+    tr.innerHTML =
+      '<td class="name-cell"><span class="swatch" style="width:9px;height:9px;border-radius:50%;background:var('+SLOT_COLORS[i]+')"></span>'+esc(comp.name)+'</td>'+
+      '<td class="num'+saleCellClass+'">'+priceWithRatioCell(curSalePrice, r.currentSaleRatio)+'</td>'+
+      '<td class="num">'+priceWithRatioCell(fairSale, r.avgSaleRatio)+'</td>'+
+      '<td class="num">'+fmtPP(r.saleDiff)+'</td>'+
+      '<td class="num'+jeonseCellClass+'">'+priceWithRatioCell(curJeonsePrice, r.currentJeonseRatio)+'</td>'+
+      '<td class="num">'+priceWithRatioCell(fairJeonse, r.avgJeonseRatio)+'</td>'+
+      '<td class="num">'+fmtPP(r.jeonseDiff)+'</td>'+
+      '<td><button class="diag-toggle'+(isOpen?' open':'')+'" data-diag-toggle="'+i+'"><span class="arrow">▸</span><span class="chip badge '+r.diag.tone+'">'+r.diag.badge+'</span></button></td>';
+    tbody.appendChild(tr);
+
+    const detailTr = document.createElement('tr');
+    detailTr.className = 'diag-detail-row';
+    detailTr.style.display = isOpen ? '' : 'none';
+    detailTr.dataset.diagDetail = i;
+    const sync = computeSyncRate(base, comp);
+    detailTr.innerHTML = '<td colspan="8"><div class="card diag-detail-card">'+buildDiagCardBody(i, comp, r, sync, true)+'</div></td>';
+    tbody.appendChild(detailTr);
+  }
+  if (!any){
+    tbody.innerHTML = '<tr><td colspan="8" style="color:var(--ink-faint)">비교단지 데이터를 입력하면 표가 채워집니다</td></tr>';
+  }
+  tbody.querySelectorAll('[data-diag-toggle]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const idx = btn.dataset.diagToggle;
+      if (openDiagRows.has(Number(idx))) openDiagRows.delete(Number(idx)); else openDiagRows.add(Number(idx));
+      const detailRow = tbody.querySelector('[data-diag-detail="'+idx+'"]');
+      const nowOpen = openDiagRows.has(Number(idx));
+      if (detailRow) detailRow.style.display = nowOpen ? '' : 'none';
+      btn.classList.toggle('open', nowOpen);
+    });
+  });
+}
+
+function esc(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderChartTabs(){
+  document.querySelectorAll('#chartTabs .tab-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.chart===state.activeChart);
+  });
+}
+
+function activeComplexes(){
+  const out = [];
+  for (let i=0;i<MAX_SLOTS;i++){
+    const c = getCompareComplex(i);
+    if (c.rows.length && state.compares[i].visible) out.push({ i, c, color: cssVar(SLOT_COLORS[i]) });
+  }
+  return out;
+}
+
+function effectiveFairLine(compsCount){
+  if (state.fairLineOverride !== null) return state.fairLineOverride;
+  return compsCount === 1;
+}
+
+function updateFairLineToggle(compsCount){
+  const btn = document.getElementById('fairLineToggle');
+  if (!btn) return;
+  const isPriceChart = state.activeChart==='sale' || state.activeChart==='jeonse';
+  btn.style.display = isPriceChart ? '' : 'none';
+  if (!isPriceChart) return;
+  const on = effectiveFairLine(compsCount);
+  btn.classList.toggle('active', on);
+  btn.textContent = on ? '📈 적정가 표시 중 (끄기)' : '📈 적정가 확인하기';
+}
+
+function updateRatioAvgToggle(){
+  const btn = document.getElementById('ratioAvgToggle');
+  if (!btn) return;
+  const show = state.activeChart==='jeonseRatioSelf' || state.activeChart==='multi';
+  btn.style.display = show ? '' : 'none';
+  if (!show) return;
+  btn.classList.toggle('active', state.ratioAvgOn);
+  btn.textContent = state.ratioAvgOn ? '📊 평균선 표시 중 (끄기)' : '📊 평균선 표시';
+}
+
+function updateRatioPeakToggle(){
+  const btn = document.getElementById('ratioPeakToggle');
+  if (!btn) return;
+  const show = state.activeChart==='jeonseRatioSelf' || state.activeChart==='multi';
+  btn.style.display = show ? '' : 'none';
+  if (!show) return;
+  btn.classList.toggle('active', state.ratioPeakOn);
+  btn.textContent = state.ratioPeakOn ? '📈 최고점 표시 중 (끄기)' : '📈 최고점 표시';
+}
+
+function updateRatioTroughToggle(){
+  const btn = document.getElementById('ratioTroughToggle');
+  if (!btn) return;
+  const show = state.activeChart==='jeonseRatioSelf' || state.activeChart==='multi';
+  btn.style.display = show ? '' : 'none';
+  if (!show) return;
+  btn.classList.toggle('active', state.ratioTroughOn);
+  btn.textContent = state.ratioTroughOn ? '📉 최저점 표시 중 (끄기)' : '📉 최저점 표시';
+}
+
+function updateBenchmarkOverlayToggle(){
+  const btn = document.getElementById('benchmarkOverlayToggle');
+  const sel = document.getElementById('benchmarkOverlaySelect');
+  if (!btn || !sel) return;
+  const show = state.activeChart==='sale' || state.activeChart==='jeonse';
+  btn.style.display = show ? '' : 'none';
+  sel.style.display = (show && state.benchmarkOverlayOn) ? '' : 'none';
+  if (!show) return;
+  btn.classList.toggle('active', state.benchmarkOverlayOn);
+  btn.textContent = state.benchmarkOverlayOn ? '🏙️ 벤치마크 표시 중 (끄기)' : '🏙️ 벤치마크 표시';
+  sel.value = state.benchmarkOverlayGroup;
+}
+
+function updateBenchFairToggle(){
+  const btn = document.getElementById('benchFairToggle');
+  if (!btn) return;
+  const show = (state.activeChart==='sale' || state.activeChart==='jeonse') && state.benchmarkOverlayOn;
+  btn.style.display = show ? '' : 'none';
+  if (!show) return;
+  btn.classList.toggle('active', state.benchFairOn);
+  btn.textContent = state.benchFairOn ? '📈 벤치마크 대비 적정가 표시 중 (끄기)' : '📈 벤치마크 대비 적정가';
+}
+
+function chartFontColor(){ return cssVar('--ink-muted'); }
+function chartGridColor(){ return cssVar('--border'); }
+
+function priceChartConfig(base, comps, field, ratioField, showFair, benchmarkOverlay, benchFairOn){
+  const allYms = new Set(base.rows.map(r=>r.ym));
+  comps.forEach(({c}) => c.rows.forEach(r=>allYms.add(r.ym)));
+  if (benchmarkOverlay) benchmarkOverlay.rows.forEach(r=>allYms.add(r.ym));
+  const labels = [...allYms].sort((a,b)=>a-b);
+  const labelStrs = labels.map(fmtYm);
+  const datasets = [{
+    label: base.name || '기준단지', _kind:'base', _color: cssVar('--series-base'),
+    data: labels.map(ym => base.rowMap.get(ym) ? base.rowMap.get(ym)[field] : null),
+    borderColor: cssVar('--series-base'), backgroundColor: cssVar('--series-base'),
+    borderWidth: 3, pointRadius: 0, tension: .15, spanGaps: false
+  }];
+  const benchmarkUsable = benchmarkOverlay && !(base.isVirtualBenchmark && base.groupKey===benchmarkOverlay.groupKey);
+  if (benchmarkUsable){
+    const carriedLabels = new Set([...(benchmarkOverlay.carriedYms||[])].map(fmtYm));
+    const benchColor = cssVar('--bench-line');
+    datasets.push({
+      label: benchmarkOverlay.name, _kind:'comp', _color: benchColor, _carriedLabels: carriedLabels,
+      data: labels.map(ym => benchmarkOverlay.rowMap.get(ym) ? benchmarkOverlay.rowMap.get(ym)[field] : null),
+      borderColor: benchColor, backgroundColor: benchColor, borderWidth: 2.5, pointRadius: 0, tension: .15, spanGaps: false,
+      segment: carriedLabels.size ? { borderDash: (ctx)=> carriedLabels.has(labelStrs[ctx.p1DataIndex]) ? [4,3] : undefined } : undefined
+    });
+    if (benchFairOn){
+      const rBase = computeSlot(benchmarkOverlay, base);
+      const baseAvgRatio = rBase.error ? null : (ratioField==='sale' ? rBase.avgSaleRatio : rBase.avgJeonseRatio);
+      if (baseAvgRatio!=null){
+        datasets.push({
+          label: (base.name||'기준단지')+' 벤치마크대비 적정가', _kind:'benchFair',
+          data: labels.map(ym => benchmarkOverlay.rowMap.get(ym) ? benchmarkOverlay.rowMap.get(ym)[field]*baseAvgRatio/100 : null),
+          borderColor: cssVar('--series-base'), backgroundColor: cssVar('--series-base'), borderWidth: 1.5, borderDash:[3,2,1,2], pointRadius:0, tension:.15, spanGaps:false
+        });
+      }
+    }
+  }
+  comps.forEach(({c, color})=>{
+    datasets.push({
+      label: c.name, _kind:'comp', _color: color,
+      data: labels.map(ym => c.rowMap.get(ym) ? c.rowMap.get(ym)[field] : null),
+      borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, tension: .15, spanGaps: false
+    });
+    if (showFair){
+      const r = computeSlot(base, c);
+      const avgRatio = r.error ? null : (ratioField==='sale' ? r.avgSaleRatio : r.avgJeonseRatio);
+      if (avgRatio!=null){
+        datasets.push({
+          label: c.name+' 적정가', _kind:'fair',
+          data: labels.map(ym => base.rowMap.get(ym) ? base.rowMap.get(ym)[field]*avgRatio/100 : null),
+          borderColor: color, backgroundColor: color, borderWidth: 1.5, borderDash:[5,4], pointRadius:0, tension:.15, spanGaps:false
+        });
+      }
+    }
+    if (benchFairOn && benchmarkUsable){
+      const rBench = computeSlot(benchmarkOverlay, c);
+      const benchAvgRatio = rBench.error ? null : (ratioField==='sale' ? rBench.avgSaleRatio : rBench.avgJeonseRatio);
+      if (benchAvgRatio!=null){
+        datasets.push({
+          label: c.name+' 벤치마크대비 적정가', _kind:'benchFair',
+          data: labels.map(ym => benchmarkOverlay.rowMap.get(ym) ? benchmarkOverlay.rowMap.get(ym)[field]*benchAvgRatio/100 : null),
+          borderColor: color, backgroundColor: color, borderWidth: 1.5, borderDash:[3,2,1,2], pointRadius:0, tension:.15, spanGaps:false
+        });
+      }
+    }
+  });
+  return {
+    type:'line',
+    data:{ labels: labelStrs, datasets },
+    options: chartOptions((v)=> fmtEok(v))
+  };
+}
+
+function ratioChartConfig(base, comps, field){
+  const unionSet = new Set();
+  const perComp = comps.map(({i,c,color})=>{
+    const r = computeSlot(base, c);
+    if (r.error) return null;
+    r.fullYms.forEach(ym=>unionSet.add(ym));
+    return { c, color, r };
+  });
+  const labels = [...unionSet].sort((a,b)=>a-b);
+  const labelStrs = labels.map(fmtYm);
+  const datasets = [{
+    label: (base.name||'기준단지')+' = 100%', data: labels.map(()=>100),
+    borderColor: cssVar('--series-base'), backgroundColor: cssVar('--series-base'),
+    borderWidth: 2, borderDash:[6,4], pointRadius:0, tension:0
+  }];
+  perComp.forEach((entry)=>{
+    if (!entry) return;
+    const { c, color, r } = entry;
+    const seriesField = field==='sale' ? 'saleSeries' : 'jeonseSeries';
+    const avgVal = field==='sale' ? r.avgSaleRatio : r.avgJeonseRatio;
+    const map = new Map(r.fullYms.map((ym,k)=>[ym, r[seriesField][k]]));
+    datasets.push({
+      label: c.name, data: labels.map(ym => map.has(ym) ? map.get(ym) : null),
+      borderColor: color, backgroundColor: color, borderWidth: 2, pointRadius: 0, tension:.15, spanGaps:false
+    });
+    if (avgVal!=null){
+      datasets.push({
+        label: c.name+' 평균('+avgVal.toFixed(1)+'%)',
+        data: labels.map(ym => map.has(ym) ? avgVal : null),
+        borderColor: color, backgroundColor: color, borderWidth: 1.25, borderDash:[4,3], pointRadius:0, tension:0
+      });
+    }
+  });
+  return {
+    type:'line', data:{ labels: labelStrs, datasets },
+    options: chartOptions((v)=> v==null?'—':v.toFixed(1)+'%')
+  };
+}
+
+function overlayChartConfig(base, comp){
+  const r = computeSlot(base, comp);
+  if (r.error) return null;
+  const labelStrs = r.fullYms.map(fmtYm);
+  const saleColor = cssVar('--series-1'), jeonseColor = cssVar('--series-2');
+  const datasets = [
+    { label:'매매 배율', data:r.saleSeries, borderColor: saleColor, backgroundColor: saleColor, borderWidth:2.5, pointRadius:0, tension:.15, spanGaps:false },
+    { label:'전세 배율', data:r.jeonseSeries, borderColor: jeonseColor, backgroundColor: jeonseColor, borderWidth:2.5, pointRadius:0, tension:.15, spanGaps:false }
+  ];
+  if (r.avgSaleRatio!=null){
+    datasets.push({ label:'매매 평균('+r.avgSaleRatio.toFixed(1)+'%)', data: r.saleSeries.map(v=> v==null?null:r.avgSaleRatio),
+      borderColor: saleColor, backgroundColor: saleColor, borderWidth:1.25, borderDash:[4,3], pointRadius:0, tension:0 });
+  }
+  if (r.avgJeonseRatio!=null){
+    datasets.push({ label:'전세 평균('+r.avgJeonseRatio.toFixed(1)+'%)', data: r.jeonseSeries.map(v=> v==null?null:r.avgJeonseRatio),
+      borderColor: jeonseColor, backgroundColor: jeonseColor, borderWidth:1.25, borderDash:[4,3], pointRadius:0, tension:0 });
+  }
+  return {
+    type:'line',
+    data:{ labels: labelStrs, datasets },
+    options: chartOptions((v)=> v==null?'—':v.toFixed(1)+'%')
+  };
+}
+
+function ratioStatCardInner(name, colorVarName, stats, threshold){
+  const swatch = '<span class="swatch" style="background:var('+colorVarName+')"></span>';
+  if (!stats){
+    return '<div class="card-head">'+swatch+'<span class="name">'+esc(name)+'</span></div><div class="card-msg">전세가율을 계산할 데이터가 부족합니다.</div>';
+  }
+  const eligibility = jeonseRatioDiagnosisEligible(findBuiltYear(name), stats, threshold);
+  let badgeHtml, messageHtml;
+  if (!eligibility.eligible){
+    badgeHtml = '<span class="badge neutral">참고용</span>';
+    messageHtml = eligibility.reason;
+  } else {
+    const interp = jeonseRatioInterpretation(stats.diff, threshold);
+    badgeHtml = '<span class="badge '+interp.tone+'">'+interp.badge+'</span>';
+    messageHtml = interp.message + (eligibility.note ? ' '+eligibility.note : '');
+  }
+  return '<div class="card-head">'+swatch+'<span class="name">'+esc(name)+'</span></div>'+
+    badgeHtml+
+    '<div class="stat-row"><span class="k">역사상 최고</span><span class="v ratio-val">'+fmtPct(stats.maxVal)+' <span class="cell-ratio">('+fmtYm(stats.maxYm)+')</span></span></div>'+
+    '<div class="stat-row"><span class="k">역사상 최저</span><span class="v ratio-val">'+fmtPct(stats.minVal)+' <span class="cell-ratio">('+fmtYm(stats.minYm)+')</span></span></div>'+
+    '<div class="stat-row"><span class="k">역사상 평균</span><span class="v ratio-val">'+fmtPct(stats.avg)+'</span></div>'+
+    '<div class="stat-row"><span class="k">현재 ('+fmtYm(stats.curYm)+')</span><span class="v ratio-val">'+fmtPct(stats.cur)+(stats.diff!=null?' <span class="cell-ratio">('+fmtPP(stats.diff)+')</span>':'')+'</span></div>'+
+    '<div class="card-msg">'+messageHtml+'</div>';
+}
+function buildRatioStatCard(entry, stats, threshold){
+  return '<div class="card">'+ratioStatCardInner(entry.name, entry.varName, stats, threshold)+'</div>';
+}
+
+function jeonseRatioChartConfig(entries, showPeak, showTrough, showAvg){
+  const allYmsSet = new Set();
+  const seriesByEntry = entries.map(entry=>{
+    const { yms, map } = selfRatioSeries(entry.complex);
+    yms.forEach(ym=>allYmsSet.add(ym));
+    return { ...entry, map };
+  });
+  const labels = [...allYmsSet].sort((a,b)=>a-b);
+  const labelStrs = labels.map(fmtYm);
+  const flat = (v) => labels.map(()=>v);
+  const datasets = seriesByEntry.map(entry=>({
+    label: entry.name, _kind: entry.key==='base'?'base':'comp',
+    data: labels.map(ym => entry.map.has(ym) ? entry.map.get(ym) : null),
+    borderColor: cssVar(entry.varName), backgroundColor: cssVar(entry.varName),
+    borderWidth: entry.key==='base'?3:2, pointRadius:0, tension:.15, spanGaps:false
+  }));
+
+  if (showPeak){
+    seriesByEntry.forEach(entry=>{
+      if (!entry.stats || entry.stats.maxVal==null) return;
+      datasets.push({
+        label: entry.name+' 역사상 최고('+entry.stats.maxVal.toFixed(1)+'%)', data: flat(entry.stats.maxVal),
+        borderColor: cssVar(entry.varName), backgroundColor: cssVar(entry.varName),
+        borderWidth:1.25, borderDash:[1,2], pointRadius:0, tension:0
+      });
+    });
+  }
+  if (showTrough){
+    seriesByEntry.forEach(entry=>{
+      if (!entry.stats || entry.stats.minVal==null) return;
+      datasets.push({
+        label: entry.name+' 역사상 최저('+entry.stats.minVal.toFixed(1)+'%)', data: flat(entry.stats.minVal),
+        borderColor: cssVar(entry.varName), backgroundColor: cssVar(entry.varName),
+        borderWidth:1.25, borderDash:[5,2,1,2], pointRadius:0, tension:0
+      });
+    });
+  }
+
+  if (showAvg){
+    seriesByEntry.forEach(entry=>{
+      if (!entry.stats || entry.stats.avg==null) return;
+      datasets.push({
+        label: entry.name+' 역사상 평균('+entry.stats.avg.toFixed(1)+'%)', data: flat(entry.stats.avg),
+        borderColor: cssVar(entry.varName), backgroundColor: cssVar(entry.varName),
+        borderWidth:1.75, borderDash:[2,2], pointRadius:0, tension:0
+      });
+    });
+    const seoul = seoulHistoricalAvg();
+    if (seoul.avg!=null){
+      datasets.push({
+        label:'서울시 역사상 평균', data: flat(seoul.avg),
+        borderColor: cssVar('--ink-faint'), backgroundColor: cssVar('--ink-faint'),
+        borderWidth:1.5, borderDash:[6,3], pointRadius:0, tension:0
+      });
+    }
+  }
+  return { type:'line', data:{ labels: labelStrs, datasets }, options: chartOptions((v)=> v==null?'—':v.toFixed(1)+'%') };
+}
+
+function multiChartConfig(entry, flags){
+  flags = flags || {};
+  const rows = entry.complex.rows;
+  const labelStrs = rows.map(r=>fmtYm(r.ym));
+  const ratioMap = selfRatioSeries(entry.complex).map;
+  const stats = entry.stats || computeSelfRatioStats(entry.complex);
+  const fontColor = chartFontColor(), gridColor = chartGridColor();
+  const saleColor = cssVar('--series-1'), jeonseColor = cssVar('--series-2'), ratioColor = cssVar('--series-4');
+  const flatRatio = (v) => rows.map(()=>v);
+  const datasets = [
+    { label:'매매가', _kind:'base', _color:saleColor, data: rows.map(r=>r.saleMid), borderColor: saleColor, backgroundColor: saleColor, borderWidth:2.5, pointRadius:0, tension:.15, spanGaps:false, yAxisID:'y' },
+    { label:'전세가', _kind:'comp', _color:jeonseColor, data: rows.map(r=>r.jeonseMid), borderColor: jeonseColor, backgroundColor: jeonseColor, borderWidth:2.5, pointRadius:0, tension:.15, spanGaps:false, yAxisID:'y' },
+    { label:'전세가율', _kind:'ratio', _color:ratioColor, data: rows.map(r=> ratioMap.has(r.ym) ? ratioMap.get(r.ym) : null), borderColor: ratioColor, backgroundColor: ratioColor, borderWidth:2, borderDash:[4,3], pointRadius:0, tension:.15, spanGaps:false, yAxisID:'y1' }
+  ];
+  if (flags.showAvg && stats && stats.avg!=null){
+    datasets.push({ label:'전세가율 역사상 평균('+stats.avg.toFixed(1)+'%)', data: flatRatio(stats.avg),
+      borderColor: ratioColor, backgroundColor: ratioColor, borderWidth:1.25, borderDash:[3,3], pointRadius:0, tension:0, yAxisID:'y1' });
+  }
+  if (flags.showPeak && stats && stats.maxVal!=null){
+    datasets.push({ label:'전세가율 역사상 최고('+stats.maxVal.toFixed(1)+'%)', data: flatRatio(stats.maxVal),
+      borderColor: ratioColor, backgroundColor: ratioColor, borderWidth:1.25, borderDash:[1,2], pointRadius:0, tension:0, yAxisID:'y1' });
+  }
+  if (flags.showTrough && stats && stats.minVal!=null){
+    datasets.push({ label:'전세가율 역사상 최저('+stats.minVal.toFixed(1)+'%)', data: flatRatio(stats.minVal),
+      borderColor: ratioColor, backgroundColor: ratioColor, borderWidth:1.25, borderDash:[5,2,1,2], pointRadius:0, tension:0, yAxisID:'y1' });
+  }
+  return {
+    type:'line',
+    data:{ labels: labelStrs, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ position:'bottom', labels:{ color:fontColor, boxWidth:10, boxHeight:10, usePointStyle:true, font:{ family:"'Noto Sans KR'", size:11.5 } } },
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': '+(ctx.dataset.yAxisID==='y1' ? (ctx.parsed.y==null?'—':ctx.parsed.y.toFixed(1)+'%') : fmtEok(ctx.parsed.y)) } }
+      },
+      scales:{
+        x:{ ticks:{ color:fontColor, maxTicksLimit:10, font:{ size:11 } }, grid:{ color:gridColor, display:false } },
+        y:{ position:'left', ticks:{ color:fontColor, font:{ size:11 }, callback:(v)=>fmtEok(v) }, grid:{ color:gridColor } },
+        y1:{ position:'right', ticks:{ color:fontColor, font:{ size:11 }, callback:(v)=>v.toFixed(0)+'%' }, grid:{ display:false } }
+      }
+    }
+  };
+}
+
+function decoupleInterpretation(d){
+  if (d.error) return { tone:'neutral', text: d.error };
+  const parts = [];
+  if (d.diff!=null){
+    if (d.diff <= -3) parts.push('현재 배율이 과거 평균보다 '+Math.abs(d.diff).toFixed(1)+'%p 낮아, 벤치마크 대비 저평가/디커플링 신호입니다.');
+    else if (d.diff >= 3) parts.push('현재 배율이 과거 평균보다 '+d.diff.toFixed(1)+'%p 높아, 벤치마크보다 앞서 오른 상태입니다.');
+    else parts.push('현재 배율이 과거 평균 범위 안에서 벤치마크와 비슷하게 움직이고 있습니다.');
+  }
+  if (d.recoveryGap!=null){
+    if (d.recoveryGap <= -5) parts.push('벤치마크는 전고점 대비 '+d.benchRecovery.toFixed(1)+'%까지 회복했는데 이 단지는 '+d.indivRecovery.toFixed(1)+'%에 그쳐, 격차 '+Math.abs(d.recoveryGap).toFixed(1)+'%p의 디커플링이 있습니다.');
+    else parts.push('벤치마크는 전고점 대비 '+d.benchRecovery.toFixed(1)+'%, 이 단지는 전고점 대비 '+d.indivRecovery.toFixed(1)+'% — 격차 '+(d.recoveryGap>=0?'+':'')+d.recoveryGap.toFixed(1)+'%p입니다.');
+  }
+  const tone = (d.diff!=null && d.diff<=-3) || (d.recoveryGap!=null && d.recoveryGap<=-5) ? 'bad' : 'neutral';
+  return { tone, text: parts.join(' ') };
+}
+
+function chartOptions(tooltipFmt){
+  const fontColor = chartFontColor(), gridColor = chartGridColor();
+  return {
+    responsive:true, maintainAspectRatio:false,
+    interaction:{ mode:'index', intersect:false },
+    plugins:{
+      legend:{ position:'bottom', labels:{ color:fontColor, boxWidth:10, boxHeight:10, usePointStyle:true, font:{ family:"'Noto Sans KR'", size:11.5 } } },
+      tooltip:{ callbacks:{ label:(ctx)=> {
+        let s = ctx.dataset.label+': '+tooltipFmt(ctx.parsed.y);
+        if (ctx.dataset._carriedLabels && ctx.dataset._carriedLabels.has(ctx.label)) s += ' (표본 부족으로 이전 값 유지)';
+        return s;
+      } } }
+    },
+    scales:{
+      x:{ ticks:{ color:fontColor, maxTicksLimit:10, font:{ size:11 } }, grid:{ color:gridColor, display:false } },
+      y:{ ticks:{ color:fontColor, font:{ size:11 }, callback:(v)=>tooltipFmt(v) }, grid:{ color:gridColor } }
+    }
+  };
+}
+
+function allTimeHigh(map, field){
+  let max = null;
+  map.forEach(row=>{
+    const v = row[field];
+    if (v!=null && (max==null || v>max)) max = v;
+  });
+  return max;
+}
+
+function buildRecentTable(base, comps, field, ratioField, benchmarkOverlay){
+  const cols = [{ name: base.name||'기준단지', map: base.rowMap, color: cssVar('--series-base'), ratio: 100, isBase:true, ath: allTimeHigh(base.rowMap, field) }]
+    .concat(comps.map(({c,color})=>{
+      const r = computeSlot(base, c);
+      const ratio = r.error ? null : (ratioField==='sale' ? r.avgSaleRatio : r.avgJeonseRatio);
+      return { name:c.name, map:c.rowMap, color, ratio, isBase:false, ath: allTimeHigh(c.rowMap, field) };
+    }));
+  const baseMap = base.rowMap;
+  const unionSet = new Set();
+  cols.forEach(col => col.map.forEach((v,ym)=>unionSet.add(ym)));
+  if (benchmarkOverlay) benchmarkOverlay.rows.forEach(r=>unionSet.add(r.ym));
+  const yms = [...unionSet].sort((a,b)=>b-a).slice(0,120);
+  let html = '<table><thead><tr><th>시세월</th>'+cols.map(c=>
+    '<th class="num name-th"><span class="swatch" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+c.color+';margin-right:5px"></span>'+esc(c.name)+
+    '<span class="ratio-tag">'+(c.ratio!=null ? fmtPct(c.ratio) : '—')+'</span>'+
+    '<span class="ath-tag">최고 '+(c.ath!=null ? fmtEok(c.ath) : '—')+'</span></th>'
+  ).join('')+
+    (benchmarkOverlay ? '<th class="num name-th">기준 ÷ 벤치마크<span class="ratio-tag">'+esc(benchmarkOverlay.name)+'</span></th>' : '')+
+    '</tr></thead><tbody>';
+  for (const ym of yms){
+    html += '<tr><td>'+fmtYm(ym)+'</td>';
+    for (const col of cols){
+      const row = col.map.get(ym);
+      const val = row ? row[field] : null;
+      let cellRatio = null;
+      let cellClass = '';
+      if (!col.isBase && val!=null){
+        const baseRow = baseMap.get(ym);
+        const baseVal = baseRow ? baseRow[field] : null;
+        if (baseVal!=null && baseVal!==0){
+          cellRatio = val/baseVal*100;
+          if (col.ratio!=null){
+            const diff = cellRatio - col.ratio;
+            if (diff >= state.threshold) cellClass = ' cell-over';
+            else if (diff <= -state.threshold) cellClass = ' cell-under';
+          }
+        }
+      }
+      html += '<td class="num'+cellClass+'">'+fmtEok(val)+(cellRatio!=null ? ' <span class="cell-ratio">('+cellRatio.toFixed(1)+'%)</span>' : '')+'</td>';
+    }
+    if (benchmarkOverlay){
+      const baseRow = baseMap.get(ym);
+      const baseVal = baseRow ? baseRow[field] : null;
+      const benchRow = benchmarkOverlay.rowMap.get(ym);
+      const benchVal = benchRow ? benchRow[field] : null;
+      const pct = (baseVal!=null && benchVal!=null && benchVal!==0) ? baseVal/benchVal*100 : null;
+      html += '<td class="num">'+(pct!=null ? pct.toFixed(1)+'%' : '—')+'</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
+function parseYmLabel(str){
+  const parts = String(str||'').split('.');
+  return { y: parseInt(parts[0],10), m: parseInt(parts[1],10) };
+}
+function monthsDiffLabel(a,b){
+  const pa=parseYmLabel(a), pb=parseYmLabel(b);
+  return (pb.y*12+pb.m) - (pa.y*12+pa.m);
+}
+function formatPeriodLabel(a,b){
+  const months = monthsDiffLabel(a,b);
+  const y = Math.floor(months/12), m = months%12;
+  const parts = [];
+  if (y>0) parts.push(y+'년');
+  if (m>0 || !parts.length) parts.push(m+'개월');
+  return parts.join(' ');
+}
+function nearestValue(arr, idx, lo, hi, dir){
+  let i = idx;
+  while (i>=lo && i<=hi){
+    if (arr[i]!=null) return arr[i];
+    i += dir;
+  }
+  return null;
+}
+function pixelIndexFromEvent(chart, clientX){
+  const rect = chart.canvas.getBoundingClientRect();
+  const px = clientX - rect.left;
+  const idx = chart.scales.x.getValueForPixel(px);
+  const n = chart.data.labels.length;
+  return Math.max(0, Math.min(n-1, Math.round(idx)));
+}
+
+let dragCleanup = null;
+function wireDragSelect(chart, wrapEl, boxEl, resultEl, opts){
+  let dragging = null;
+  const canvasEl = chart.canvas;
+
+  function setBox(x1, x2){
+    const r = wrapEl.getBoundingClientRect();
+    const left = Math.max(0, Math.min(x1, x2) - r.left);
+    const width = Math.abs(x2 - x1);
+    boxEl.style.left = left+'px';
+    boxEl.style.width = width+'px';
+    boxEl.hidden = false;
+  }
+  function onMouseDown(e){
+    if (e.button!==0) return;
+    e.preventDefault();
+    dragging = { startClientX: e.clientX, startIdx: pixelIndexFromEvent(chart, e.clientX) };
+    setBox(e.clientX, e.clientX);
+  }
+  function onMouseMove(e){
+    if (!dragging) return;
+    setBox(dragging.startClientX, e.clientX);
+  }
+  function onMouseUp(e){
+    if (!dragging) return;
+    const endIdx = pixelIndexFromEvent(chart, e.clientX);
+    const startIdx = dragging.startIdx;
+    dragging = null;
+    if (Math.abs(endIdx-startIdx) < 1){
+      boxEl.hidden = true;
+      resultEl.hidden = true;
+      return;
+    }
+    renderDragResult(chart, Math.min(startIdx,endIdx), Math.max(startIdx,endIdx), resultEl, opts);
+  }
+
+  canvasEl.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+
+  return () => {
+    canvasEl.removeEventListener('mousedown', onMouseDown);
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
+}
+
+function renderDragResult(chart, lo, hi, resultEl, opts){
+  opts = opts || {};
+  const labels = chart.data.labels;
+  const startLabel = labels[lo], endLabel = labels[hi];
+  const priceRows = [], ratioRows = [];
+  chart.data.datasets.forEach(ds=>{
+    if (ds._kind!=='base' && ds._kind!=='comp' && ds._kind!=='ratio') return;
+    const startVal = nearestValue(ds.data, lo, lo, hi, 1);
+    const endVal = nearestValue(ds.data, hi, lo, hi, -1);
+    if (startVal==null || endVal==null) return;
+    if (ds._kind==='ratio'){
+      ratioRows.push({ label: ds.label, color: ds._color, isRatio:true, startVal, endVal, sortVal: endVal-startVal });
+      return;
+    }
+    if (startVal===0) return;
+    const rate = (endVal-startVal)/startVal*100;
+    priceRows.push({ label: ds.label, color: ds._color, startVal, endVal, rate, sortVal: rate });
+  });
+  priceRows.sort((a,b)=> b.sortVal-a.sortVal);
+  ratioRows.sort((a,b)=> b.sortVal-a.sortVal);
+  resultEl.querySelector('[data-role=dragRange]').textContent =
+    startLabel+' ~ '+endLabel+' ('+formatPeriodLabel(startLabel,endLabel)+')';
+  const listEl = resultEl.querySelector('[data-role=dragList]');
+  const rowHtml = (r) => {
+    if (r.isRatio){
+      const diffPP = r.endVal - r.startVal;
+      const tone = diffPP>=0 ? 'up' : 'down';
+      return '<div class="drag-row">'+
+        '<span class="swatch" style="background:'+r.color+'"></span>'+
+        '<span class="drag-name">'+esc(r.label)+'</span>'+
+        '<span class="drag-diff">'+r.startVal.toFixed(1)+'%→'+r.endVal.toFixed(1)+'%</span>'+
+        '<span class="drag-rate '+tone+'">'+(diffPP>=0?'+':'')+diffPP.toFixed(1)+'%p</span>'+
+      '</div>';
+    }
+    const diff = r.endVal - r.startVal;
+    const tone = r.rate>=0 ? 'up' : 'down';
+    const diffCell = opts.showRange ? fmtEok(r.startVal)+' → '+fmtEok(r.endVal) : (diff>=0?'+':'')+fmtEok(diff);
+    const rateCell = opts.showRange
+      ? (diff>=0?'+':'')+fmtEok(diff)+' ('+(r.rate>=0?'+':'')+r.rate.toFixed(1)+'%)'
+      : (r.rate>=0?'+':'')+r.rate.toFixed(1)+'%';
+    return '<div class="drag-row">'+
+      '<span class="swatch" style="background:'+r.color+'"></span>'+
+      '<span class="drag-name">'+esc(r.label)+'</span>'+
+      '<span class="drag-diff '+tone+'">'+diffCell+'</span>'+
+      '<span class="drag-rate '+tone+'">'+rateCell+'</span>'+
+    '</div>';
+  };
+  const allRows = priceRows.concat(ratioRows).map(rowHtml);
+  listEl.innerHTML = allRows.length
+    ? allRows.join(opts.showRange ? '<div class="drag-divider"></div>' : '')
+    : '<div class="drag-empty">이 구간에 표시할 데이터가 없습니다.</div>';
+  resultEl.hidden = false;
+}
+
+function renderActiveChart(base){
+  const area = document.getElementById('chartArea');
+  const comps = activeComplexes();
+  updateFairLineToggle(comps.length);
+  updateRatioAvgToggle();
+  updateRatioPeakToggle();
+  updateRatioTroughToggle();
+  updateBenchmarkOverlayToggle();
+  updateBenchFairToggle();
+  if (!base.rows.length){
+    area.innerHTML = '<div class="empty-state">기준단지 데이터를 입력하면 그래프가 표시됩니다.</div>';
+    return;
+  }
+  if (!comps.length && state.activeChart!=='sale' && state.activeChart!=='jeonse' && state.activeChart!=='jeonseRatioSelf' && state.activeChart!=='multi'){
+    area.innerHTML = '<div class="empty-state">비교단지 데이터를 입력하면 그래프가 표시됩니다.</div>';
+  }
+
+  Object.keys(charts).forEach(destroyChart);
+  if (dragCleanup){ dragCleanup(); dragCleanup = null; }
+
+  if (state.activeChart==='sale' || state.activeChart==='jeonse'){
+    const field = state.activeChart==='sale' ? 'saleMid' : 'jeonseMid';
+    area.innerHTML =
+      '<div class="chart-layout">'+
+        '<div class="chart-box"><div class="chart-canvas-wrap" id="chartCanvasWrap">'+
+          '<canvas id="mainCanvas"></canvas>'+
+          '<div class="drag-select-box" id="dragBox" hidden></div>'+
+          '<div class="drag-result" id="dragResult" hidden>'+
+            '<div class="drag-result-head">'+
+              '<span data-role="dragRange"></span>'+
+              '<button class="clear-link" id="dragResultClear">✕</button>'+
+            '</div>'+
+            '<div class="drag-result-list" data-role="dragList"></div>'+
+          '</div>'+
+        '</div></div>'+
+        '<div class="recent-box" id="recentTable"></div>'+
+      '</div>';
+    const ratioField = state.activeChart==='sale' ? 'sale' : 'jeonse';
+    const showFair = effectiveFairLine(comps.length);
+    const benchmarkOverlay = state.benchmarkOverlayOn ? getVirtualBenchmarkComplex(state.benchmarkOverlayGroup) : null;
+    const cfg = priceChartConfig(base, comps, field, ratioField, showFair, benchmarkOverlay, state.benchFairOn);
+    charts.mainCanvas = new Chart(document.getElementById('mainCanvas'), cfg);
+    document.getElementById('recentTable').innerHTML = buildRecentTable(base, comps, field, ratioField, benchmarkOverlay);
+    const dragResult = document.getElementById('dragResult');
+    dragCleanup = wireDragSelect(charts.mainCanvas, document.getElementById('chartCanvasWrap'), document.getElementById('dragBox'), dragResult);
+    document.getElementById('dragResultClear').addEventListener('click', ()=>{
+      dragResult.hidden = true;
+      document.getElementById('dragBox').hidden = true;
+    });
+    return;
+  }
+  if (state.activeChart==='jeonseRatioSelf'){
+    const entries = [{ key:'base', name: base.name||'기준단지', complex: base, varName:'--series-base' }]
+      .concat(comps.map(({i,c})=>({ key:String(i), name:c.name, complex:c, varName:SLOT_COLORS[i] })));
+    entries.forEach(entry => { entry.stats = computeSelfRatioStats(entry.complex); });
+    const cardsHtml = entries.map(entry => buildRatioStatCard(entry, entry.stats, state.threshold)).join('');
+    area.innerHTML =
+      '<div class="chart-layout solo"><div class="chart-box"><canvas id="mainCanvas"></canvas></div></div>'+
+      '<div class="common-range" id="ratioNote"></div>'+
+      '<div class="cards-grid" style="margin-top:14px;">'+cardsHtml+'</div>';
+    const cfg = jeonseRatioChartConfig(entries, state.ratioPeakOn, state.ratioTroughOn, state.ratioAvgOn);
+    charts.mainCanvas = new Chart(document.getElementById('mainCanvas'), cfg);
+    let note = '';
+    if (state.ratioAvgOn){
+      note = '서울시 평균은 현재 라이브러리에 등록된 단지 기준 근사치이며, 실제 서울 전체 통계와 다를 수 있습니다.';
+    }
+    document.getElementById('ratioNote').textContent = note;
+    return;
+  }
+  if (state.activeChart==='multi'){
+    const entries = [{ key:'base', name: base.name||'기준단지', complex: base, varName:'--series-base' }]
+      .concat(comps.map(({i,c})=>({ key:String(i), name:c.name, complex:c, varName:SLOT_COLORS[i] })))
+      .concat([
+        { key:'bench-seoul', name: BENCHMARK_GROUPS.seoul.label, complex: getVirtualBenchmarkComplex('seoul'), varName:null },
+        { key:'bench-rebuild', name: BENCHMARK_GROUPS.rebuild.label, complex: getVirtualBenchmarkComplex('rebuild'), varName:null }
+      ]);
+    if (state.multiSlot==null || !entries.find(x=>x.key===state.multiSlot)) state.multiSlot = 'base';
+    const controls = '<div class="overlay-controls"><span class="grp-label">단지 선택</span><select id="multiSelect">'+
+      entries.map(e=>'<option value="'+e.key+'"'+(e.key===state.multiSlot?' selected':'')+'>'+esc(e.name)+'</option>').join('')+
+      '</select></div>';
+    const target = entries.find(x=>x.key===state.multiSlot);
+    target.stats = computeSelfRatioStats(target.complex);
+
+    let decoupleHtml = '';
+    if (!target.complex.isVirtualBenchmark){
+      const groupKey = state.benchmarkChoice['multi'] || 'seoul';
+      const dSale = computeDecoupling(target.complex, groupKey, 'saleMid');
+      const dJeonse = computeDecoupling(target.complex, groupKey, 'jeonseMid');
+      const saleInterp = decoupleInterpretation(dSale);
+      const jeonseInterp = decoupleInterpretation(dJeonse);
+      const rowHtml = (label, interp) => interp.tone==='bad'
+        ? '<div class="reinforce-msg bad" style="margin-top:8px;"><b>'+label+'</b> — '+interp.text+'</div>'
+        : '<div class="card-msg" style="margin-top:8px;"><b>'+label+'</b> — '+interp.text+'</div>';
+      const groupSelect = '<select class="btn small" id="multiBenchmarkGroup">'+
+        '<option value="seoul"'+(groupKey==='seoul'?' selected':'')+'>서울 일반 벤치마크</option>'+
+        '<option value="rebuild"'+(groupKey==='rebuild'?' selected':'')+'>재건축 벤치마크</option>'+
+        '</select>';
+      decoupleHtml = '<div class="card" style="margin-top:14px;">'+
+        '<div class="card-head"><span class="name">벤치마크 대비 디커플링</span></div>'+
+        groupSelect+
+        rowHtml('매매가 디커플링', saleInterp)+
+        rowHtml('전세가 디커플링', jeonseInterp)+
+      '</div>';
+    }
+
+    area.innerHTML = controls+
+      '<div class="chart-layout solo"><div class="chart-box"><div class="chart-canvas-wrap" id="chartCanvasWrap">'+
+        '<canvas id="mainCanvas"></canvas>'+
+        '<div class="drag-select-box" id="dragBox" hidden></div>'+
+        '<div class="drag-result" id="dragResult" hidden>'+
+          '<div class="drag-result-head">'+
+            '<span data-role="dragRange"></span>'+
+            '<button class="clear-link" id="dragResultClear">✕</button>'+
+          '</div>'+
+          '<div class="drag-result-list" data-role="dragList"></div>'+
+        '</div>'+
+      '</div></div></div>'+
+      decoupleHtml;
+    document.getElementById('multiSelect').addEventListener('change', (e)=>{ state.multiSlot = e.target.value; saveState(); renderActiveChart(getBaseComplex()); });
+    const groupSelectEl = document.getElementById('multiBenchmarkGroup');
+    if (groupSelectEl) groupSelectEl.addEventListener('change', (e)=>{ state.benchmarkChoice['multi'] = e.target.value; saveState(); renderActiveChart(getBaseComplex()); });
+    charts.mainCanvas = new Chart(document.getElementById('mainCanvas'), multiChartConfig(target, { showPeak: state.ratioPeakOn, showTrough: state.ratioTroughOn, showAvg: state.ratioAvgOn }));
+    const dragResult = document.getElementById('dragResult');
+    dragCleanup = wireDragSelect(charts.mainCanvas, document.getElementById('chartCanvasWrap'), document.getElementById('dragBox'), dragResult, { showRange:true });
+    document.getElementById('dragResultClear').addEventListener('click', ()=>{
+      dragResult.hidden = true;
+      document.getElementById('dragBox').hidden = true;
+    });
+    return;
+  }
+  if (state.activeChart==='saleRatio' || state.activeChart==='jeonseRatio'){
+    if (!comps.length){ area.innerHTML = '<div class="empty-state">비교단지 데이터를 입력하면 배율 그래프가 표시됩니다.</div>'; return; }
+    area.innerHTML = '<div class="chart-layout solo"><div class="chart-box"><canvas id="mainCanvas"></canvas></div></div>';
+    const cfg = ratioChartConfig(base, comps, state.activeChart==='saleRatio'?'sale':'jeonse');
+    charts.mainCanvas = new Chart(document.getElementById('mainCanvas'), cfg);
+    return;
+  }
+  if (state.activeChart==='overlay'){
+    if (!comps.length){ area.innerHTML = '<div class="empty-state">비교단지 데이터를 입력하면 오버레이 그래프가 표시됩니다.</div>'; return; }
+    if (state.overlaySlot==null || !comps.find(x=>x.i===state.overlaySlot)) state.overlaySlot = comps[0].i;
+    const overlayHint = '<div class="common-range" style="margin-bottom:8px;">이 그래프는 현재 선택된 기준단지와 비교단지 간의 매매/전세 배율(비율) 추이를 보여줍니다.</div>';
+    let controls = '<div class="overlay-controls"><span class="grp-label">비교단지 선택</span><select id="overlaySelect">'+
+      comps.map(({i,c})=>'<option value="'+i+'"'+(i===state.overlaySlot?' selected':'')+'>'+esc(c.name)+'</option>').join('')+
+      '</select></div>';
+    area.innerHTML = overlayHint+controls+'<div class="chart-layout solo"><div class="chart-box"><canvas id="mainCanvas"></canvas></div></div>';
+    document.getElementById('overlaySelect').addEventListener('change', (e)=>{ state.overlaySlot = parseInt(e.target.value,10); renderActiveChart(getBaseComplex()); });
+    const target = comps.find(x=>x.i===state.overlaySlot);
+    const cfg = overlayChartConfig(base, target.c);
+    if (cfg) charts.mainCanvas = new Chart(document.getElementById('mainCanvas'), cfg);
+    else area.querySelector('.chart-layout').innerHTML = '<div class="empty-state">공통 구간이 없습니다.</div>';
+  }
+}
+
+let debounceTimer = null;
+function debounceRender(){ clearTimeout(debounceTimer); debounceTimer = setTimeout(render, 350); }
+
+function wireStaticEvents(){
+  document.getElementById('basePreset').addEventListener('change', (e)=>{
+    state.basePreset = e.target.value;
+    if (state.basePreset==='benchmark-seoul' || state.basePreset==='benchmark-rebuild'){
+      state.baseName = BENCHMARK_GROUPS[state.basePreset==='benchmark-seoul'?'seoul':'rebuild'].label;
+      saveState(); render(); return;
+    }
+    if (state.basePreset==='custom'){
+      saveState(); render(); return;
+    }
+    const label = state.basePreset==='els' ? '잠실엘스' : '은마아파트';
+    const entry = state.library.find(x=>x.name===label);
+    if (entry){ state.baseText = entry.text; state.baseName=''; usingSeed=false; }
+    else { state.baseText=''; state.baseName=label; }
+    saveState(); render();
+  });
+  document.getElementById('baseName').addEventListener('input', (e)=>{ state.baseName = e.target.value; saveState(); debounceRender(); });
+  document.getElementById('baseText').addEventListener('input', (e)=>{ state.baseText = e.target.value; usingSeed=false; saveState(); debounceRender(); });
+  document.getElementById('thresholdInput').addEventListener('input', (e)=>{
+    const v = parseFloat(e.target.value); state.threshold = Number.isFinite(v) && v>0 ? v : 3; saveState(); render();
+  });
+  document.querySelectorAll('#periodSeg button').forEach(b=>{
+    b.addEventListener('click', ()=>{ state.period = b.dataset.period; saveState(); render(); });
+  });
+  document.querySelectorAll('#chartTabs .tab-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{ state.activeChart = b.dataset.chart; render(); });
+  });
+  document.getElementById('fairLineToggle').addEventListener('click', ()=>{
+    const comps = activeComplexes();
+    const current = effectiveFairLine(comps.length);
+    state.fairLineOverride = !current;
+    saveState(); render();
+  });
+  document.getElementById('ratioAvgToggle').addEventListener('click', ()=>{
+    state.ratioAvgOn = !state.ratioAvgOn;
+    saveState(); render();
+  });
+  document.getElementById('ratioPeakToggle').addEventListener('click', ()=>{
+    state.ratioPeakOn = !state.ratioPeakOn;
+    saveState(); render();
+  });
+  document.getElementById('ratioTroughToggle').addEventListener('click', ()=>{
+    state.ratioTroughOn = !state.ratioTroughOn;
+    saveState(); render();
+  });
+  document.getElementById('benchmarkOverlayToggle').addEventListener('click', ()=>{
+    state.benchmarkOverlayOn = !state.benchmarkOverlayOn;
+    saveState(); render();
+  });
+  document.getElementById('benchmarkOverlaySelect').addEventListener('change', (e)=>{
+    state.benchmarkOverlayGroup = e.target.value;
+    saveState(); render();
+  });
+  document.getElementById('benchFairToggle').addEventListener('click', ()=>{
+    state.benchFairOn = !state.benchFairOn;
+    saveState(); render();
+  });
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    if (!confirm('현재 작업 중인 기준·비교단지 입력을 지우고 새로 시작할까요? (저장된 라이브러리는 유지됩니다)')) return;
+    state.threshold=3; state.period='all'; state.basePreset='els'; state.baseText=''; state.baseName='';
+    state.compares = Array.from({length:MAX_SLOTS}, (_,i)=>({text:'',name:'',visible:true}));
+    state.activeSlot=0; state.activeChart='sale'; state.overlaySlot=null; state.multiSlot=null; state.fairLineOverride=null; state.ratioPeakOn=false; state.ratioTroughOn=false; state.ratioAvgOn=false; usingSeed=false;
+    saveState();
+    render();
+  });
+  document.getElementById('clearAllCompares').addEventListener('click', ()=>{
+    if (!confirm('비교단지 1~'+MAX_SLOTS+'번을 모두 비울까요? (기준단지·라이브러리는 그대로 유지됩니다)')) return;
+    state.compares = Array.from({length:MAX_SLOTS}, ()=>({text:'',name:'',visible:true}));
+    state.activeSlot = 0; state.overlaySlot = null; state.multiSlot = null; state.fairLineOverride = null;
+    saveState(); render();
+  });
+  document.getElementById('baseLibSelect').addEventListener('change', (e)=>{
+    const entry = state.library.find(x=>x.name===e.target.value);
+    if (!entry) return;
+    state.baseText = entry.text; state.baseName = entry.name; state.basePreset = 'custom'; usingSeed = false;
+    saveState(); render();
+  });
+  document.getElementById('baseLibSave').addEventListener('click', ()=>{
+    saveToLibrary(getBaseComplex().name, state.baseText);
+  });
+  document.getElementById('refComplexSelect').addEventListener('change', (e)=>{
+    state.refComplexName = e.target.value;
+    saveState(); render();
+  });
+  wireUploadButton(document.getElementById('baseUploadBtn'), document.getElementById('baseUploadInput'), (results)=>{
+    const first = results[0];
+    state.baseText = first.text; state.baseName = first.name; state.basePreset = 'custom'; usingSeed = false;
+    saveState(); render();
+    saveToLibrary(first.name, first.text, {silent: results.length>1});
+    if (results.length>1){
+      alert('기준단지는 1개만 가능해 "'+first.name+'"만 반영했습니다.\n나머지 '+(results.length-1)+'개는 비교단지 슬롯에서 "엑셀 파일로 단지 넣기"로 넣어주세요. (라이브러리에는 모두 저장해두겠습니다)');
+      results.slice(1).forEach(r=> saveToLibrary(r.name, r.text, {silent:true}));
+      refreshLibraryUI();
+    }
+  });
+  document.getElementById('libExportBtn').addEventListener('click', exportLibrary);
+  document.getElementById('libImportBtn').addEventListener('click', ()=> document.getElementById('libImportInput').click());
+  document.getElementById('libImportInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (file) importLibraryFile(file);
+    e.target.value = '';
+  });
+  document.getElementById('gasUrlInput').addEventListener('change', (e)=>{
+    state.gasUrl = e.target.value.trim(); saveState(); refreshGasStatus();
+  });
+  document.getElementById('gasRefreshBtn').addEventListener('click', gasFetchList);
+  if (window.matchMedia){
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=> render());
+  }
+}
+
+function findLibraryEntryById(id){
+  return state.library.find(e => e.id === id)
+      || (window.SEED_COMPLEXES || []).find(s => s.id === id)
+      || null;
+}
+
+function applyUrlParams(){
+  const params = new URLSearchParams(window.location.search);
+  const baseId = params.get('기준단지');
+  const compareIdsRaw = params.get('비교단지');
+  if (!baseId) return;
+
+  const baseEntry = findLibraryEntryById(baseId);
+  if (!baseEntry){
+    console.warn('applyUrlParams: 기준단지 id를 찾을 수 없습니다:', baseId);
+    return;
+  }
+
+  if (!confirm('급지표에서 선택한 단지로 기준/비교단지를 채웁니다. 현재 입력된 내용은 대체됩니다. 계속할까요?')) return;
+
+  state.baseText = baseEntry.text;
+  state.baseName = baseEntry.name;
+
+  const compareIds = (compareIdsRaw || '').split(',').map(s=>s.trim()).filter(Boolean).slice(0, MAX_SLOTS);
+  state.compares = Array.from({length: MAX_SLOTS}, () => ({ text:'', name:'', visible:true }));
+  compareIds.forEach((id, i) => {
+    const entry = findLibraryEntryById(id);
+    if (entry){
+      state.compares[i] = { text: entry.text, name: entry.name, visible: true };
+    }
+  });
+  usingSeed = false;
+  saveState();
+}
+
+loadState();
+applyUrlParams();
+wireStaticEvents();
+render();
+if (state.gasUrl) gasFetchList();
+</script>

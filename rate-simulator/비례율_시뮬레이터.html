@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>비례율 시뮬레이터</title>
+<script src="../config.js"></script>
+<script src="../gate.js"></script>
+<script>requireSiteAuth('../index.html');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="calc.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#F4F6F8; --surface:#FFFFFF; --surface-alt:#EDF2F4;
+  --border:#DCE3E9; --border-strong:#C6D0D7;
+  --ink:#182430; --ink-muted:#61707D; --ink-faint:#93A1AC;
+  --accent:#0E5C6B; --accent-soft:#E4F0F1; --accent-ink:#FFFFFF;
+  --good:#1E8E5A; --good-bg:#E5F5EC;
+  --bad:#C63F3F; --bad-bg:#FBEAEA;
+  --warn:#A9720E; --warn-bg:#FBF1DF;
+  --info:#2F6FE0; --info-bg:#EAF1FD;
+  --neutral-bg:#EDF1F4;
+  --shadow:0 1px 2px rgba(24,36,48,.06), 0 6px 16px -10px rgba(24,36,48,.18);
+  --font-display:'Noto Serif KR', ui-serif, 'Nanum Myeongjo', serif;
+  --font-body:'Noto Sans KR', ui-sans-serif, -apple-system, 'Malgun Gothic', sans-serif;
+  --font-mono:'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#12181D; --surface:#1A2229; --surface-alt:#1F2830;
+    --border:#2B3841; --border-strong:#3A4750;
+    --ink:#E7ECEF; --ink-muted:#9AAAB4; --ink-faint:#657580;
+    --accent:#4FBAC6; --accent-soft:#193338; --accent-ink:#0B1418;
+    --good:#3FD495; --good-bg:#123328;
+    --bad:#FF7A7A; --bad-bg:#3A1D1D;
+    --warn:#E8B85B; --warn-bg:#3A2E14;
+    --info:#6FA3FF; --info-bg:#16233A;
+    --neutral-bg:#232D35;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 24px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#12181D; --surface:#1A2229; --surface-alt:#1F2830;
+  --border:#2B3841; --border-strong:#3A4750;
+  --ink:#E7ECEF; --ink-muted:#9AAAB4; --ink-faint:#657580;
+  --accent:#4FBAC6; --accent-soft:#193338; --accent-ink:#0B1418;
+  --good:#3FD495; --good-bg:#123328;
+  --bad:#FF7A7A; --bad-bg:#3A1D1D;
+  --warn:#E8B85B; --warn-bg:#3A2E14;
+  --info:#6FA3FF; --info-bg:#16233A;
+  --neutral-bg:#232D35;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 24px -14px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14.5px;line-height:1.55;}
+.wrap{max-width:1180px;margin:0 auto;padding:22px clamp(16px,2vw,28px) 60px;}
+.card.narrow{max-width:820px;margin-left:auto;margin-right:auto;}
+.layout-grid{display:grid;grid-template-columns:1fr 360px;gap:18px;align-items:start;}
+@media (max-width:999px){
+  .layout-grid{grid-template-columns:1fr;}
+}
+@media (min-width:1000px){
+  .layout-side{position:sticky;top:16px;}
+}
+.layout-main{min-width:0;}
+.layout-side{min-width:0;}
+.layout-main .card{margin-bottom:18px;}
+.layout-main .card:last-child{margin-bottom:0;}
+.rep-unit-select{border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--ink);border-radius:6px;padding:2px 6px;font-size:12px;font-family:var(--font-mono);margin-left:4px;max-width:100%;}
+.value-arrow-row{display:flex;align-items:center;gap:6px;}
+.value-arrow-row .value-readonly{flex:1.1;background:var(--neutral-bg);color:var(--ink-muted);}
+.value-arrow-row .arrow-icon{flex:0 0 auto;color:var(--ink-faint);font-size:14px;}
+.value-arrow-row .value-input{flex:0.9;min-width:0;}
+.project-io-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.project-io-row select.btn{padding:6px 8px;}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;}
+button{cursor:pointer;}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:18px;flex-wrap:wrap;}
+.topbar h1{font-size:clamp(20px,2.6vw,27px);font-weight:700;letter-spacing:-.01em;}
+.topbar .sub{color:var(--ink-muted);font-size:13px;margin-top:4px;}
+.btn{border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-muted);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;transition:border-color .15s, color .15s, background .15s;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.small{padding:6px 11px;font-size:11.5px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:18px;}
+.card h2{font-size:16px;font-weight:700;margin-bottom:12px;}
+.field-row{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;}
+.field{flex:1;min-width:180px;}
+.field label{display:block;font-size:12px;color:var(--ink-muted);margin-bottom:4px;}
+.field input{width:100%;border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--ink);border-radius:8px;padding:8px 10px;font-family:var(--font-mono);font-size:13px;}
+.field input.auto-computed{background:var(--neutral-bg);color:var(--ink-muted);}
+.field-row.change-fields{align-items:stretch;}
+.field-row.change-fields > .field{display:flex;flex-direction:column;}
+.field-row.change-fields > .field > label{min-height:2.7em;display:flex;align-items:flex-end;}
+.field-row.change-fields > .field > .hint{flex:1 0 auto;}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+.seg button{border:none;background:var(--surface-alt);color:var(--ink-muted);padding:6px 10px;font-size:11.5px;font-weight:600;border-right:1px solid var(--border-strong);}
+.seg button:last-child{border-right:none;}
+.seg button.active{background:var(--accent);color:var(--accent-ink);}
+.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 12px;font-weight:700;font-size:13px;}
+.badge.good{background:var(--good-bg);color:var(--good);}
+.badge.bad{background:var(--bad-bg);color:var(--bad);}
+.badge.neutral{background:var(--neutral-bg);color:var(--ink-muted);}
+.easy-summary{font-size:14px;color:var(--ink);line-height:1.6;font-weight:600;margin:10px 0;}
+.detail-toggle{display:inline-block;margin-top:4px;background:none;border:none;padding:0;font-size:11.5px;color:var(--info);cursor:pointer;text-decoration:underline;}
+.detail-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px;}
+.detail-table td{padding:5px 6px;border-bottom:1px solid var(--border);}
+.detail-table td:last-child{text-align:right;font-family:var(--font-mono);}
+.unit-rows{display:flex;flex-direction:column;gap:8px;}
+.unit-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0;}
+.unit-row input{border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--ink);border-radius:8px;padding:6px 8px;font-family:var(--font-mono);font-size:12.5px;}
+.unit-row .label-input{width:70px;flex:0 0 70px;}
+.unit-row .count-input{width:70px;flex:0 0 70px;}
+.unit-row .price-input{flex:1 1 120px;min-width:100px;}
+.unit-row .remove-row{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;}
+.unit-row .remove-row:hover{color:var(--bad);}
+.unit-row .pyeong-hint{font-size:11px;color:var(--ink-faint);white-space:normal;flex:1 1 100%;order:5;}
+.collapsible{margin-top:10px;}
+.collapsible > summary{cursor:pointer;font-size:12.5px;color:var(--accent);font-weight:600;list-style:none;}
+.collapsible > summary::-webkit-details-marker{display:none;}
+.contingency-item{border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;}
+.contingency-item .head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;}
+.contingency-item .head strong{font-size:12.5px;}
+.contingency-item .seg{margin-top:6px;}
+.contingency-item input{width:100%;border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--ink);border-radius:8px;padding:6px 8px;font-family:var(--font-mono);font-size:12.5px;margin-top:6px;}
+.contingency-item .rate-row{display:flex;gap:8px;margin-top:6px;}
+.contingency-item .rate-row input{margin-top:0;}
+.contingency-badge{background:var(--warn-bg);color:var(--warn);border-radius:999px;padding:2px 9px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+.reserve-note{margin-top:14px;padding:10px 12px;border:1px dashed var(--warn);border-radius:8px;background:var(--warn-bg);color:var(--ink);font-size:12.5px;line-height:1.6;}
+.reserve-note strong{color:var(--warn);}
+.reference-details{margin-bottom:18px;}
+.reference-details > summary{font-size:13.5px;}
+.reference-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px;}
+.reference-table td{padding:6px 8px;border-bottom:1px solid var(--border);}
+.reference-table td:nth-child(2){text-align:right;font-family:var(--font-mono);white-space:nowrap;}
+.reference-table td:nth-child(3){width:28px;text-align:center;}
+.ref-help{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:999px;background:var(--info-bg);color:var(--info);font-size:11px;font-weight:700;cursor:help;}
+[hidden]{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>비례율 시뮬레이터</h1>
+      <div class="sub">공사비·분양가가 바뀌면 비례율과 추가분담금이 어떻게 달라지는지 계산합니다 · 모든 금액은 만원 단위로 입력합니다</div>
+    </div>
+    <div class="project-io-row">
+      <button class="btn small" id="simpleModeToggle" type="button">약식 계산</button>
+      <button class="btn small" id="themeToggle" type="button">다크모드</button>
+    </div>
+  </div>
+
+  <div id="mainPanel">
+    <div class="layout-grid">
+      <div class="layout-main">
+    <div class="card" id="step1Panel">
+      <h2>1단계. 평형별 세대수 · 분양가</h2>
+
+      <div class="field-row" style="align-items:flex-end;">
+        <div class="field" style="max-width:220px;">
+          <label>구역명 (저장/불러오기용)</label>
+          <input type="text" id="projectName" placeholder="예: OO구역">
+        </div>
+        <div class="field project-io-row" style="flex:2;">
+          <button class="btn small" id="btnSaveLocal" type="button">💾 저장하기</button>
+          <select class="btn small" id="projectLibSelect"><option value="">불러올 구역 선택...</option></select>
+          <button class="btn small" id="btnLoadLocal" type="button">📂 불러오기</button>
+          <button class="btn small" id="btnExportJson" type="button">⬇ JSON 내보내기</button>
+          <button class="btn small" id="btnImportJson" type="button">⬆ JSON 불러오기</button>
+          <input type="file" id="importJsonInput" accept=".json" hidden>
+          <button class="btn small" id="btnExportExcel" type="button">📊 엑셀로 내보내기</button>
+          <button class="btn small" id="btnResetAll" type="button">🔄 초기화</button>
+        </div>
+      </div>
+      <div id="saveStatus" style="font-size:11px;color:var(--ink-faint);margin:-4px 0 10px;"></div>
+
+      <div class="field-row">
+        <div class="field"><label>종전자산가액(C, 만원)</label><input type="text" id="a_C" placeholder="예: 7179039"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>연면적(㎡)</label><input type="text" id="a_areaSqm" placeholder="예: 137293.51"></div>
+        <div class="field"><label>평당 공사비(만원)</label><input type="text" id="a_pricePerPyeong" placeholder="예: 583"></div>
+        <div class="field"><label>총공사비(만원)</label><input type="text" id="a_totalCost" placeholder="예: 8004557"></div>
+      </div>
+      <div class="hint" style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;">※ 연면적·평당공사비·총공사비 중 2개를 입력하면 나머지 1개가 자동계산됩니다(회색 표시). 자동계산된 칸을 직접 클릭해 수정하면, 그 전까지 입력했던 값 중 가장 오래된 칸이 대신 자동계산으로 바뀝니다.</div>
+      <div class="field-row">
+        <div class="field"><label>총지출(만원)</label><input type="text" id="a_totalExpense" placeholder="예: 37809941"></div>
+        <div class="field"><label>기타사업비 (자동계산, 만원)</label><input type="text" id="a_etc" disabled></div>
+      </div>
+      <div id="a_expenseRatio" style="font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;"></div>
+
+      <details class="collapsible">
+        <summary>기타사업비 상세 (선택)</summary>
+
+        <div class="contingency-item">
+          <div class="head"><strong>① 예비비</strong><span class="contingency-badge">⚠ 실집행 안 되면 비례율 상승 요인이 될 수 있는 항목</span></div>
+          <div class="seg" id="seg_a_reserve"><button data-mode="flat" class="active" type="button">정액</button><button data-mode="rate" type="button">연 %×기간</button></div>
+          <input type="text" id="a_reserve_flat" placeholder="금액(만원)">
+          <div class="rate-row" id="a_reserve_rateRow" hidden>
+            <input type="text" id="a_reserve_rate" placeholder="연 %">
+            <input type="text" id="a_reserve_years" placeholder="사업기간(년)">
+          </div>
+        </div>
+
+        <div class="contingency-item">
+          <div class="head"><strong>② 미분양대책비</strong><span class="contingency-badge">⚠ 실집행 안 되면 비례율 상승 요인이 될 수 있는 항목</span></div>
+          <div class="seg" id="seg_a_unsold"><button data-mode="flat" class="active" type="button">정액</button><button data-mode="rate" type="button">연 %×기간</button></div>
+          <input type="text" id="a_unsold_flat" placeholder="금액(만원)">
+          <div class="rate-row" id="a_unsold_rateRow" hidden>
+            <input type="text" id="a_unsold_rate" placeholder="연 %">
+            <input type="text" id="a_unsold_years" placeholder="사업기간(년)">
+          </div>
+        </div>
+
+        <div class="contingency-item">
+          <div class="head"><strong>③ 금융비용(이주비이자)</strong></div>
+          <div class="seg" id="seg_a_finance"><button data-mode="flat" class="active" type="button">정액</button><button data-mode="rate" type="button">연 %×기간</button></div>
+          <input type="text" id="a_finance_flat" placeholder="금액(만원)">
+          <div class="rate-row" id="a_finance_rateRow" hidden>
+            <input type="text" id="a_finance_rate" placeholder="연 %">
+            <input type="text" id="a_finance_years" placeholder="사업기간(년)">
+          </div>
+        </div>
+
+        <div class="contingency-item">
+          <div class="head"><strong>④ 각종부담금</strong></div>
+          <div class="seg" id="seg_a_burden"><button data-mode="flat" class="active" type="button">정액</button><button data-mode="rate" type="button">연 %×기간</button></div>
+          <input type="text" id="a_burden_flat" placeholder="금액(만원)">
+          <div class="rate-row" id="a_burden_rateRow" hidden>
+            <input type="text" id="a_burden_rate" placeholder="연 %">
+            <input type="text" id="a_burden_years" placeholder="사업기간(년)">
+          </div>
+        </div>
+
+        <div class="contingency-item">
+          <div class="head"><strong>⑤ 기타 (자동계산 = 기타사업비 - ①~④ 합)</strong></div>
+          <input type="text" id="a_etcResidual" disabled>
+        </div>
+        <div id="a_etcResidualWarn"></div>
+        <div style="font-size:11px;color:var(--ink-faint);margin-top:6px;">※ "연 %×기간" 모드는 공사비를 기준으로 계산합니다 (금액 = 공사비 × 연 %  × 사업기간)</div>
+      </details>
+
+      <div class="field-row" style="margin-top:14px;">
+        <div class="field"><label>총수입(만원, 조합원분양+일반분양 평형별 합계 + 기타수입)</label><input type="text" id="a_totalIncome" placeholder="예: 44638678"></div>
+        <div class="field"><label>기타수입 (자동계산, 만원)</label><input type="text" id="a_other" disabled></div>
+      </div>
+      <div id="a_otherIncomeWarn"></div>
+
+      <h3 style="font-size:13px;margin:14px 0 6px;">조합원분양</h3>
+      <div class="unit-rows" id="a_memberRows"></div>
+      <button class="btn small" id="a_addMemberRow" type="button" style="margin-top:8px;">+ 평형 추가</button>
+
+      <h3 style="font-size:13px;margin:16px 0 6px;">일반분양</h3>
+      <div class="unit-rows" id="a_generalRows"></div>
+      <button class="btn small" id="a_addGeneralRow" type="button" style="margin-top:8px;">+ 평형 추가</button>
+
+      <div id="a_rateBadge" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="card" id="step2Panel">
+      <h2>2단계. 변경값 입력</h2>
+      <div class="field-row change-fields">
+        <div class="field">
+          <label>일반분양매출 — 대표 평형 <select id="repUnitSelect" class="rep-unit-select"></select></label>
+          <div class="value-arrow-row">
+            <input type="text" id="repCurPriceDisplay" class="value-readonly" readonly placeholder="현재 분양가">
+            <span class="arrow-icon">→</span>
+            <input type="text" id="c_repNewPrice" class="value-input" placeholder="예상 분양가(만원)">
+          </div>
+          <div class="hint" id="repUnitHint" style="font-size:11px;color:var(--ink-faint);margin-top:4px;"></div>
+        </div>
+        <div class="field">
+          <label>공사비 — 평당공사비</label>
+          <div class="value-arrow-row">
+            <input type="text" id="curPricePerPyeongDisplay" class="value-readonly" readonly placeholder="현재 평당공사비">
+            <span class="arrow-icon">→</span>
+            <input type="text" id="c_repNewPricePerPyeong" class="value-input" placeholder="예상 평당공사비(만원)">
+          </div>
+          <div class="hint" id="repCostHint" style="font-size:11px;color:var(--ink-faint);margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <details class="collapsible">
+        <summary>직접 입력 (고급)</summary>
+        <div class="field-row" style="margin-top:10px;">
+          <div class="field">
+            <label>일반분양매출 변경 <span class="seg" id="seg_ilban"><button data-mode="pct" class="active" type="button">%</button><button data-mode="amt" type="button">금액</button><button data-mode="unit" type="button">단가</button></span></label>
+            <input type="text" id="c_ilbanInput" placeholder="예: 9.28">
+            <div class="field-row" id="c_ilbanUnitRow" hidden style="margin-top:6px;margin-bottom:0;">
+              <div class="field"><input type="text" id="c_ilbanOldPrice" placeholder="변경 전 단가(만원)"></div>
+              <div class="field"><input type="text" id="c_ilbanNewPrice" placeholder="변경 후 단가(만원)"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>공사비 변경 <span class="seg" id="seg_cost"><button data-mode="pct" class="active" type="button">%</button><button data-mode="amt" type="button">금액</button></span></label>
+            <input type="text" id="c_costInput" placeholder="예: 20">
+          </div>
+        </div>
+      </details>
+
+      <div class="field-row" style="margin-top:14px;">
+        <div class="field">
+          <label>기타사업비 변경 <span class="seg" id="seg_etc"><button data-mode="amt" class="active" type="button">정액</button><button data-mode="pct" type="button">비율(%)</button></span></label>
+          <input type="text" id="c_etcInput" placeholder="예: 0">
+          <div class="hint" id="etcHint" style="font-size:11px;color:var(--ink-faint);margin-top:4px;"></div>
+        </div>
+      </div>
+    </div>
+      </div>
+
+      <div class="layout-side">
+        <details class="card collapsible reference-details" open>
+          <summary>📋 실제 재개발 구역 사례 참고 (숫자 대조용) — (?) 아이콘에 마우스를 올리면 어느 칸에 넣어야 하는지 화살표로 안내합니다</summary>
+          <table class="reference-table">
+            <tr><td>계 (총사업비)</td><td>37,809,941만원</td><td><span class="ref-help" data-target="a_totalExpense">?</span></td></tr>
+            <tr><td>종전자산 총평가액</td><td>7,179,039만원</td><td><span class="ref-help" data-target="a_C">?</span></td></tr>
+            <tr><td>조합원분양수입</td><td>25,867,623만원</td><td><span class="ref-help" data-target="a_memberRows">?</span></td></tr>
+            <tr><td>일반분양수입</td><td>13,201,139만원</td><td><span class="ref-help" data-target="a_generalRows">?</span></td></tr>
+            <tr><td>연면적</td><td>137,293.51㎡</td><td><span class="ref-help" data-target="a_areaSqm">?</span></td></tr>
+            <tr><td>관리처분 시 비례율 (참고)</td><td>95.12%</td><td></td></tr>
+          </table>
+        </details>
+      </div>
+    </div>
+
+    <div class="card narrow" id="simplifiedPanel" hidden>
+      <h2>약식 계산</h2>
+      <div class="hint" style="font-size:11.5px;color:var(--ink-faint);margin-bottom:10px;">※ 종전자산가액(C)을 쓰지 않는 간이 근사 모델입니다. 정밀한 비례율 기반 계산은 고급 모드를 이용하세요. 약식 모드로 들어올 때 조합원분양수입·일반분양수입·조합원수는 1단계 평형별 표의 세대수×분양가 합계값으로 자동 채워집니다(직접 수정 가능). 반대로 고급 모드로 돌아갈 때는 공사비·평당공사비·변경값만 자동 이관되고, 분양수입·조합원수는 평형별 표 구조상 역으로는 자동 이관되지 않습니다.</div>
+      <div class="field-row">
+        <div class="field"><label>총공사비(만원)</label><input type="text" id="simple_totalCost" placeholder="예: 24212740"></div>
+        <div class="field"><label>평당공사비(만원)</label><input type="text" id="simple_pricePerPyeong" placeholder="예: 583"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>조합원분양수입(만원)</label><input type="text" id="simple_memberIncome" placeholder="예: 25867623"></div>
+        <div class="field"><label>일반분양수입(만원)</label><input type="text" id="simple_generalIncome" placeholder="예: 13201139"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>조합원수</label><input type="text" id="simple_memberCount" placeholder="예: 641"></div>
+        <div class="field"><label>대표평형 현재 일반분양가(만원)</label><input type="text" id="simple_repPrice" placeholder="예: 48501"></div>
+      </div>
+      <h3 style="font-size:13px;margin:16px 0 6px;">변경값</h3>
+      <div class="field-row">
+        <div class="field"><label>인상될 평당공사비(만원)</label><input type="text" id="simple_newPricePerPyeong" placeholder="예: 700"></div>
+        <div class="field"><label>바뀔 대표평형 일반분양가(만원)</label><input type="text" id="simple_newRepPrice" placeholder="예: 53000"></div>
+      </div>
+      <div id="simpleResultBody" style="margin-top:14px;"></div>
+    </div>
+
+    <div id="advancedExtras">
+    <div class="card narrow">
+      <h2>내 매물 감정가 (선택)</h2>
+      <div class="field-row">
+        <div class="field"><label>감정가(만원)</label><input type="text" id="p_myAppraisal" placeholder="입력하면 개인화된 결과가 표시됩니다"></div>
+      </div>
+    </div>
+
+    <div class="card narrow">
+      <h2>3단계. 결과</h2>
+      <div id="resultBody"></div>
+      <div id="unitComparisonBody"></div>
+    </div>
+
+    <div class="card narrow">
+      <h2>시뮬레이션 — 목표값찾기</h2>
+      <div id="targetFinderBody"></div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<svg id="mappingArrowSvg" style="position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:9999;">
+  <defs>
+    <marker id="arrowHead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L7,3 z" style="fill:var(--accent);"></path>
+    </marker>
+  </defs>
+  <path id="mappingArrowPath" d="" style="stroke:var(--accent);stroke-width:2.5;fill:none;transition:opacity .12s;" marker-end="url(#arrowHead)" opacity="0"></path>
+</svg>
+
+<script>
+(function(){
+  const themeToggle = document.getElementById('themeToggle');
+  themeToggle.addEventListener('click', () => {
+    const root = document.documentElement;
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  });
+
+  function toNumber(v){
+    if (v == null || v === '') return 0;
+    const n = Number(String(v).replace(/,/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  // 금액 입력 필드는 항상 "만원" 단위로 표시/입력받는다. 내부 계산은 항상 원 단위 raw 값으로 수행한다.
+  function toWon(v){
+    return window.RateCalc.manwonToWon(toNumber(v));
+  }
+
+  function readMoneyField(id){
+    return toWon(document.getElementById(id).value);
+  }
+
+  function setMoneyField(id, won){
+    document.getElementById(id).value = won ? window.RateCalc.wonToManwon(won).toLocaleString('ko-KR') : '';
+  }
+
+  // 천단위 쉼표 포맷: 포커스 중엔 숫자만, blur 시 쉼표를 붙인다. toNumber()는 쉼표 유무와 무관하게 파싱하므로 계산에는 영향 없다.
+  function attachThousandsFormatting(el){
+    el.addEventListener('focus', () => {
+      if (el.value === '') return;
+      const raw = toNumber(el.value);
+      el.value = raw || raw === 0 ? String(raw) : el.value;
+    });
+    el.addEventListener('blur', () => {
+      if (el.value === '') return;
+      const raw = toNumber(el.value);
+      el.value = raw.toLocaleString('ko-KR', { maximumFractionDigits: 4 });
+    });
+  }
+
+  function attachThousandsFormattingAll(selector){
+    document.querySelectorAll(selector).forEach(attachThousandsFormatting);
+  }
+
+  function formatManwon(won){
+    if (won == null || !Number.isFinite(won)) return '-';
+    return window.RateCalc.wonToManwon(won).toLocaleString('ko-KR') + '만원';
+  }
+
+  function formatPct(n){
+    if (n == null || !Number.isFinite(n)) return '-';
+    return (n * 100).toFixed(2) + '%';
+  }
+
+  function readUnitRows(container){
+    return Array.from(container.querySelectorAll('.unit-row')).map(row => ({
+      count: toNumber(row.querySelector('.count-input').value),
+      unitPrice: toWon(row.querySelector('.price-input').value),
+    }));
+  }
+
+  // 평형별 표(1단계)와 조합원수/연면적/평당공사비 등을 읽어 계산 기준값을 만든다.
+  // 더 이상 별도의 "약식 모드" 필드가 없으므로 항상 이 표에서 직접 읽는다.
+  function readBaselineState(){
+    const memberRows = readUnitRows(document.getElementById('a_memberRows'));
+    const generalRows = readUnitRows(document.getElementById('a_generalRows'));
+    const memberSum = window.RateCalc.sumUnitRows(memberRows);
+    const generalSum = window.RateCalc.sumUnitRows(generalRows);
+    const C = readMoneyField('a_C');
+    const areaSqm = toNumber(document.getElementById('a_areaSqm').value);
+    const pricePerPyeong = readMoneyField('a_pricePerPyeong');
+    const cost = readMoneyField('a_totalCost');
+    const totalExpense = readMoneyField('a_totalExpense');
+    const etc = window.RateCalc.calcOtherExpense(totalExpense, cost);
+    const totalIncome = readMoneyField('a_totalIncome');
+    const memberJeobun = memberSum.totalAmount;
+    const memberIlban = generalSum.totalAmount;
+    const memberOther = window.RateCalc.calcOtherIncome(totalIncome, memberJeobun, memberIlban);
+    return {
+      C, memberCount: memberSum.totalCount, generalUnits: generalSum.totalCount,
+      totalIncome, memberJeobun, memberIlban, memberOther,
+      areaSqm, pricePerPyeong, cost, totalExpense, etc,
+    };
+  }
+
+  function renderOtherIncomeWarn(warnId, other){
+    const warnEl = document.getElementById(warnId);
+    warnEl.innerHTML = (other < 0)
+      ? '<span class="badge bad">⚠ 총수입이 조합원분양매출+일반분양매출 합계보다 작습니다 (기타수입 음수)</span>'
+      : '';
+  }
+
+  function renderExpenseRatio(elId, cost, etc){
+    const el = document.getElementById(elId);
+    const total = cost + etc;
+    if (!total){
+      el.innerHTML = '';
+      return;
+    }
+    if (etc < 0){
+      el.innerHTML = '<span class="badge bad">⚠ 총지출이 공사비보다 작습니다 (기타사업비 음수)</span>';
+      return;
+    }
+    const costPct = (cost / total * 100).toFixed(0);
+    const etcPct = (etc / total * 100).toFixed(0);
+    el.textContent = '공사비 ' + costPct + '% / 기타사업비 ' + etcPct + '%';
+  }
+
+  // 연면적/평당공사비/총공사비 3원 순환 자동계산: 항상 "가장 최근에 사용자가 채운 2개"로 나머지 1개를 계산한다.
+  const COST_TRIAD_FIELDS = { area: 'a_areaSqm', price: 'a_pricePerPyeong', cost: 'a_totalCost' };
+  let costTriadOrder = [];
+
+  function markCostTriadEdited(key){
+    costTriadOrder = costTriadOrder.filter(k => k !== key);
+    costTriadOrder.push(key);
+    if (costTriadOrder.length > 2) costTriadOrder.shift();
+  }
+
+  function recomputeCostTriad(){
+    const areaEl = document.getElementById('a_areaSqm');
+    const priceEl = document.getElementById('a_pricePerPyeong');
+    const costEl = document.getElementById('a_totalCost');
+    const all = ['area', 'price', 'cost'];
+    const autoKey = costTriadOrder.length === 2 ? all.find(k => !costTriadOrder.includes(k)) : null;
+
+    all.forEach(k => {
+      document.getElementById(COST_TRIAD_FIELDS[k]).classList.toggle('auto-computed', k === autoKey);
+    });
+    if (!autoKey) return;
+
+    const area = toNumber(areaEl.value);
+    const price = toWon(priceEl.value);
+    const cost = toWon(costEl.value);
+
+    if (autoKey === 'cost' && area && price){
+      setMoneyField('a_totalCost', window.RateCalc.calcTotalConstructionCost(area, price));
+    } else if (autoKey === 'area' && cost && price){
+      const computedArea = window.RateCalc.calcAreaFromCost(cost, price);
+      areaEl.value = (computedArea != null) ? Number(computedArea.toFixed(2)) : '';
+    } else if (autoKey === 'price' && cost && area){
+      setMoneyField('a_pricePerPyeong', window.RateCalc.calcPricePerPyeongFromCost(cost, area));
+    }
+  }
+
+  function updateUnitRowPyeongHint(row){
+    const label = row.querySelector('.label-input').value;
+    const sqm = parseFloat(label);
+    const hint = row.querySelector('.pyeong-hint');
+    const priceManwon = toNumber(row.querySelector('.price-input').value);
+    if (!Number.isFinite(sqm) || !priceManwon){
+      hint.textContent = '';
+      return;
+    }
+    const pyeong = window.RateCalc.calcPyeong(sqm);
+    const pricePerPyeong = Math.round(priceManwon / pyeong);
+    hint.textContent = '(약 ' + Math.round(pyeong) + '평, 평당 ' + pricePerPyeong.toLocaleString('ko-KR') + '만원)';
+  }
+
+  function makeUnitRow(container, label, count, price){
+    const row = document.createElement('div');
+    row.className = 'unit-row';
+    row.innerHTML =
+      '<input class="label-input" type="text" value="' + (label || '') + '" placeholder="평형">' +
+      '<input class="count-input" type="text" value="' + (count != null ? count : '') + '" placeholder="세대수">' +
+      '<input class="price-input" type="text" value="' + (price != null ? price : '') + '" placeholder="세대당 분양가(만원)">' +
+      '<span class="pyeong-hint"></span>' +
+      '<button class="remove-row" type="button">&times;</button>';
+    row.querySelector('.remove-row').addEventListener('click', () => {
+      row.remove();
+      recomputeAll();
+    });
+    row.querySelectorAll('input').forEach(el => el.addEventListener('input', recomputeAll));
+    row.querySelector('.label-input').addEventListener('input', () => updateUnitRowPyeongHint(row));
+    row.querySelector('.price-input').addEventListener('input', () => updateUnitRowPyeongHint(row));
+    attachThousandsFormatting(row.querySelector('.price-input'));
+    updateUnitRowPyeongHint(row);
+    container.appendChild(row);
+  }
+
+  const contingencyMode = { a_reserve: 'flat', a_unsold: 'flat', a_finance: 'flat', a_burden: 'flat' };
+
+  function setupContingencySeg(prefix){
+    const seg = document.getElementById('seg_' + prefix);
+    const flatInput = document.getElementById(prefix + '_flat');
+    const rateRow = document.getElementById(prefix + '_rateRow');
+    seg.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        contingencyMode[prefix] = btn.dataset.mode;
+        flatInput.hidden = (btn.dataset.mode === 'rate');
+        rateRow.hidden = (btn.dataset.mode === 'flat');
+        seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+        recomputeAll();
+      });
+    });
+  }
+  ['a_reserve', 'a_unsold', 'a_finance', 'a_burden'].forEach(setupContingencySeg);
+
+  function readContingencyAmount(prefix, costWon){
+    if (contingencyMode[prefix] === 'flat'){
+      return toWon(document.getElementById(prefix + '_flat').value);
+    }
+    const rate = toNumber(document.getElementById(prefix + '_rate').value);
+    const years = toNumber(document.getElementById(prefix + '_years').value);
+    return costWon * (rate / 100) * years;
+  }
+
+  let repUnitOverride = null; // 사용자가 대표 평형을 직접 선택하면 그 평형 라벨, 아니면 null(세대수 최다 자동 선택)
+
+  function getGeneralUnitRows(){
+    return Array.from(document.getElementById('a_generalRows').querySelectorAll('.unit-row')).map(row => ({
+      label: row.querySelector('.label-input').value,
+      count: toNumber(row.querySelector('.count-input').value),
+      unitPrice: toWon(row.querySelector('.price-input').value),
+    })).filter(r => r.count > 0);
+  }
+
+  function findRepresentativeGeneralUnit(){
+    const rows = getGeneralUnitRows();
+    if (!rows.length) return null;
+    if (repUnitOverride){
+      const match = rows.find(r => r.label === repUnitOverride);
+      if (match) return match;
+    }
+    return rows.reduce((max, r) => (r.count > max.count ? r : max));
+  }
+
+  function refreshRepUnitSelect(rows, rep){
+    const sel = document.getElementById('repUnitSelect');
+    const labels = Array.from(new Set(rows.map(r => r.label).filter(Boolean)));
+    if (!labels.length){
+      sel.innerHTML = '<option value="">-</option>';
+      sel.disabled = true;
+      return;
+    }
+    sel.disabled = false;
+    sel.innerHTML = labels.map(l =>
+      '<option value="' + l.replace(/"/g, '&quot;') + '"' + (rep && l === rep.label ? ' selected' : '') + '>' + l + '㎡</option>'
+    ).join('');
+  }
+
+  document.getElementById('repUnitSelect').addEventListener('change', (e) => {
+    repUnitOverride = e.target.value || null;
+    renderRepUnitWidgets();
+  });
+
+  function renderRepUnitWidgets(){
+    const rows = getGeneralUnitRows();
+    const rep = findRepresentativeGeneralUnit();
+    refreshRepUnitSelect(rows, rep);
+    const hint = document.getElementById('repUnitHint');
+    const curPriceDisplay = document.getElementById('repCurPriceDisplay');
+    if (!rep){
+      curPriceDisplay.value = '';
+      hint.textContent = '1단계 평형별 표에 일반분양 데이터를 입력하면 자동으로 인식됩니다.';
+    } else {
+      curPriceDisplay.value = formatManwon(rep.unitPrice);
+      const newPriceManwon = toNumber(document.getElementById('c_repNewPrice').value);
+      if (newPriceManwon){
+        const newPriceWon = window.RateCalc.manwonToWon(newPriceManwon);
+        const rate = window.RateCalc.calcRateFromRepresentativeUnit(rep.unitPrice, newPriceWon);
+        forceIlbanPct(rate);
+        hint.textContent = rep.label + '㎡ 분양가가 ' + toEok(rep.unitPrice) + '→' + toEok(newPriceWon) + '으로 오르면(' + (rate >= 0 ? '+' : '') + rate.toFixed(2) + '%), 전체 일반분양매출도 같은 비율로 늘어난다고 가정해 계산했습니다. 실제로는 평형별로 인상폭이 다를 수 있어 참고용 추정치입니다.';
+      } else {
+        hint.textContent = '';
+      }
+    }
+
+    const costHint = document.getElementById('repCostHint');
+    const s = readBaselineState();
+    document.getElementById('curPricePerPyeongDisplay').value = s.pricePerPyeong ? formatManwon(s.pricePerPyeong) : '';
+    const newPricePerPyeongManwon = toNumber(document.getElementById('c_repNewPricePerPyeong').value);
+    if (s.pricePerPyeong && newPricePerPyeongManwon){
+      const newPricePerPyeongWon = window.RateCalc.manwonToWon(newPricePerPyeongManwon);
+      const rate = window.RateCalc.calcRateFromRepresentativeUnit(s.pricePerPyeong, newPricePerPyeongWon);
+      forceSegPct('seg_cost', 'c_costInput', rate);
+      costHint.textContent = '평당 공사비가 ' + formatManwon(s.pricePerPyeong) + '→' + formatManwon(newPricePerPyeongWon) + '으로 오르면(' + (rate >= 0 ? '+' : '') + rate.toFixed(2) + '%), 총공사비도 같은 비율로 늘어난다고 가정해 계산했습니다. 실제로는 항목별로 인상폭이 다를 수 있어 참고용 추정치입니다.';
+    } else {
+      costHint.textContent = '';
+    }
+    if (typeof renderResult === 'function') renderResult();
+  }
+
+  // 1단계(평형별 표, 연면적/공사비/총지출/총수입 등)가 바뀔 때마다 파생값을 전부 다시 계산해 화면에 반영한다.
+  function recomputeAll(){
+    recomputeCostTriad();
+    const s = readBaselineState();
+
+    setMoneyField('a_etc', s.etc);
+    renderExpenseRatio('a_expenseRatio', s.cost, s.etc);
+
+    const reserveWon = readContingencyAmount('a_reserve', s.cost);
+    const unsoldWon = readContingencyAmount('a_unsold', s.cost);
+    const financeWon = readContingencyAmount('a_finance', s.cost);
+    const burdenWon = readContingencyAmount('a_burden', s.cost);
+    const etcResidual = s.etc - (reserveWon + unsoldWon + financeWon + burdenWon);
+    setMoneyField('a_etcResidual', etcResidual);
+    document.getElementById('a_etcResidualWarn').innerHTML = (etcResidual < 0)
+      ? '<span class="badge bad">⚠ ①~④ 합계가 기타사업비 총액을 초과합니다</span>'
+      : '';
+    window.latestContingencyReserve = window.RateCalc.calcContingencyReserve(reserveWon, unsoldWon);
+
+    setMoneyField('a_other', s.memberOther);
+    renderOtherIncomeWarn('a_otherIncomeWarn', s.memberOther);
+
+    const A0 = s.memberJeobun + s.memberIlban + s.memberOther;
+    const B0 = s.cost + s.etc;
+    const rate0 = window.RateCalc.calcProportion({ C: s.C, A: A0, B: B0 });
+    const badge = document.getElementById('a_rateBadge');
+    badge.innerHTML = (rate0 == null)
+      ? '<span class="badge neutral">종전자산가액을 입력하면 기존 비례율이 표시됩니다</span>'
+      : '<span class="badge good">기존 비례율 ' + formatPct(rate0) + ' (조합원 ' + s.memberCount + '명)</span>';
+
+    if (typeof renderRepUnitWidgets === 'function') renderRepUnitWidgets();
+    if (typeof renderEtcHint === 'function') renderEtcHint();
+    if (typeof renderResult === 'function') renderResult();
+  }
+
+  const memberRowsEl = document.getElementById('a_memberRows');
+  const generalRowsEl = document.getElementById('a_generalRows');
+  ['59', '74', '84'].forEach(label => makeUnitRow(memberRowsEl, label, '', ''));
+  ['59', '74', '84'].forEach(label => makeUnitRow(generalRowsEl, label, '', ''));
+
+  document.getElementById('a_addMemberRow').addEventListener('click', () => makeUnitRow(memberRowsEl, '', '', ''));
+  document.getElementById('a_addGeneralRow').addEventListener('click', () => makeUnitRow(generalRowsEl, '', '', ''));
+  document.getElementById('a_areaSqm').addEventListener('input', () => markCostTriadEdited('area'));
+  document.getElementById('a_pricePerPyeong').addEventListener('input', () => markCostTriadEdited('price'));
+  document.getElementById('a_totalCost').addEventListener('input', () => markCostTriadEdited('cost'));
+  document.querySelectorAll('#step1Panel input').forEach(el => el.addEventListener('input', recomputeAll));
+  document.getElementById('c_repNewPrice').addEventListener('input', () => renderRepUnitWidgets());
+  document.getElementById('c_repNewPricePerPyeong').addEventListener('input', () => renderRepUnitWidgets());
+
+  function setupSegToggle(segId, inputId, getBase){
+    const seg = document.getElementById(segId);
+    const input = document.getElementById(inputId);
+    seg._mode = 'pct';
+    seg.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const base = getBase();
+        const raw = toNumber(input.value);
+        if (btn.dataset.mode === seg._mode) return;
+        if (btn.dataset.mode === 'amt' && seg._mode === 'pct'){
+          const amountWon = window.RateCalc.pctToAmount(base, raw);
+          input.value = base ? window.RateCalc.wonToManwon(amountWon) : '';
+        } else if (btn.dataset.mode === 'pct' && seg._mode === 'amt'){
+          const amountWon = window.RateCalc.manwonToWon(raw);
+          const pct = window.RateCalc.amountToPct(base, amountWon);
+          input.value = pct == null ? '' : Number(pct.toFixed(4));
+        }
+        seg._mode = btn.dataset.mode;
+        seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+    return () => seg._mode;
+  }
+
+  function forceSegPct(segId, inputId, pctValue){
+    const seg = document.getElementById(segId);
+    seg._mode = 'pct';
+    document.getElementById(inputId).value = Number(pctValue.toFixed(4));
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === 'pct'));
+  }
+
+  function readIlbanUnitDeltaWon(){
+    const oldPriceWon = toWon(document.getElementById('c_ilbanOldPrice').value);
+    const newPriceWon = toWon(document.getElementById('c_ilbanNewPrice').value);
+    const units = readBaselineState().generalUnits;
+    return window.RateCalc.calcSalesPriceChange(oldPriceWon, newPriceWon, units);
+  }
+
+  function setupIlbanToggle(){
+    const seg = document.getElementById('seg_ilban');
+    const input = document.getElementById('c_ilbanInput');
+    const unitRow = document.getElementById('c_ilbanUnitRow');
+    seg._mode = 'pct';
+    seg.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newMode = btn.dataset.mode;
+        if (newMode === seg._mode) return;
+        const base = readBaselineState().memberIlban;
+
+        let deltaWon;
+        if (seg._mode === 'pct'){
+          deltaWon = window.RateCalc.pctToAmount(base, toNumber(input.value)) - base;
+        } else if (seg._mode === 'amt'){
+          deltaWon = window.RateCalc.manwonToWon(toNumber(input.value)) - base;
+        } else {
+          deltaWon = readIlbanUnitDeltaWon();
+        }
+
+        if (newMode === 'unit'){
+          input.hidden = true;
+          unitRow.hidden = false;
+        } else {
+          input.hidden = false;
+          unitRow.hidden = true;
+          if (newMode === 'pct'){
+            const pct = window.RateCalc.amountToPct(base, base + deltaWon);
+            input.value = pct == null ? '' : Number(pct.toFixed(4));
+          } else {
+            input.value = base ? window.RateCalc.wonToManwon(base + deltaWon) : '';
+          }
+        }
+        seg._mode = newMode;
+        seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+    return () => seg._mode;
+  }
+
+  function forceIlbanPct(pctValue){
+    const seg = document.getElementById('seg_ilban');
+    seg._mode = 'pct';
+    document.getElementById('c_ilbanInput').hidden = false;
+    document.getElementById('c_ilbanUnitRow').hidden = true;
+    document.getElementById('c_ilbanInput').value = Number(pctValue.toFixed(4));
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === 'pct'));
+  }
+
+  const getIlbanMode = setupIlbanToggle();
+  const getCostMode = setupSegToggle('seg_cost', 'c_costInput', () => readBaselineState().cost);
+
+  const etcInput = document.getElementById('c_etcInput');
+
+  // 기타사업비 변경 정액/비율 토글: 두 모드 모두 "변경액"(델타)을 나타낸다 (기존 총액을 대체하는 절대값이 아님).
+  let etcMode = 'amt';
+
+  function setupEtcToggle(){
+    const seg = document.getElementById('seg_etc');
+    seg.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const newMode = btn.dataset.mode;
+        if (newMode === etcMode) return;
+        const base = readBaselineState().etc;
+        let deltaWon;
+        if (etcMode === 'amt'){
+          deltaWon = toWon(etcInput.value);
+        } else {
+          deltaWon = window.RateCalc.calcOtherExpenseChangeFromRate(base, toNumber(etcInput.value));
+        }
+        etcMode = newMode;
+        if (etcMode === 'pct'){
+          const pct = window.RateCalc.amountToPct(base, base + deltaWon);
+          etcInput.value = pct == null ? '' : Number(pct.toFixed(4));
+        } else {
+          etcInput.value = deltaWon ? window.RateCalc.wonToManwon(deltaWon) : '';
+        }
+        seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+        renderEtcHint();
+        renderResult();
+      });
+    });
+  }
+  setupEtcToggle();
+
+  function readEtcDeltaWon(baseEtc){
+    return etcMode === 'pct'
+      ? window.RateCalc.calcOtherExpenseChangeFromRate(baseEtc, toNumber(etcInput.value))
+      : toWon(etcInput.value);
+  }
+
+  // 비율(%) 모드일 때만 "N% 증가/감소하면 OO만원만큼 늘어납니다/줄어듭니다" 해석 문구를 보여준다.
+  // 정액 모드는 입력값 자체가 이미 만원 단위 변경액이라 별도 해석이 필요 없다.
+  function renderEtcHint(){
+    const hintEl = document.getElementById('etcHint');
+    if (etcMode !== 'pct'){
+      hintEl.textContent = '';
+      return;
+    }
+    const base = readBaselineState().etc;
+    const pct = toNumber(etcInput.value);
+    if (!base || !pct){
+      hintEl.textContent = '';
+      return;
+    }
+    const deltaWon = window.RateCalc.calcOtherExpenseChangeFromRate(base, pct);
+    hintEl.textContent = '기타사업비가 기존 ' + formatManwon(base) + '에서 ' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '% ' + (pct >= 0 ? '증가' : '감소') + '하면 ' + formatManwon(Math.abs(deltaWon)) + '만큼 ' + (deltaWon >= 0 ? '늘어납니다.' : '줄어듭니다.');
+  }
+  etcInput.addEventListener('input', renderEtcHint);
+
+  function readChangeState(){
+    const s = readBaselineState();
+    const ilbanMode = getIlbanMode();
+    let newIlban;
+    if (ilbanMode === 'unit'){
+      newIlban = s.memberIlban + readIlbanUnitDeltaWon();
+    } else {
+      const ilbanRaw = toNumber(document.getElementById('c_ilbanInput').value);
+      newIlban = ilbanMode === 'pct'
+        ? window.RateCalc.pctToAmount(s.memberIlban, ilbanRaw)
+        : window.RateCalc.manwonToWon(ilbanRaw);
+    }
+    const costRaw = toNumber(document.getElementById('c_costInput').value);
+    const newCost = getCostMode() === 'pct'
+      ? window.RateCalc.pctToAmount(s.cost, costRaw)
+      : window.RateCalc.manwonToWon(costRaw);
+    const etcDelta = readEtcDeltaWon(s.etc);
+    const newEtc = s.etc + etcDelta;
+    const A1 = s.memberJeobun + newIlban + s.memberOther;
+    const B1 = newCost + newEtc;
+    return {
+      A1, B1,
+      costDelta: newCost - s.cost,
+      etcDelta: etcDelta,
+      salesDelta: newIlban - s.memberIlban,
+    };
+  }
+
+  function toEok(n){
+    return (n / 100000000).toFixed(1) + '억';
+  }
+  function toManwon(n){
+    return Math.round(n / 10000).toLocaleString('ko-KR') + '만원';
+  }
+
+  function buildEasySummary(r, change){
+    const costDelta = change.costDelta;
+    const etcDelta = change.etcDelta;
+    const totalExpenseDelta = costDelta + etcDelta; // == r.X
+    const salesDelta = change.salesDelta;
+    const diff = Math.abs(totalExpenseDelta - salesDelta);
+    const arrow = r.deltaRate < 0 ? '하락' : (r.deltaRate > 0 ? '상승' : '변화 없음');
+    const hasEtc = Math.abs(etcDelta) > 0;
+
+    const salesLabel = '일반분양가 인상(' + toEok(salesDelta) + ')';
+    const expenseLabel = hasEtc
+      ? '공사비 인상(' + toEok(costDelta) + ')과 기타사업비 변경(' + toEok(etcDelta) + ')을 합한 총지출 증가(' + toEok(totalExpenseDelta) + ')'
+      : '공사비 인상(' + toEok(costDelta) + ')';
+    const leadSentence = totalExpenseDelta > salesDelta
+      ? expenseLabel + '이 ' + salesLabel + '보다 ' + toEok(diff) + ' 더 커서'
+      : salesLabel + '이 ' + expenseLabel + '보다 ' + toEok(diff) + ' 더 커서';
+
+    const rateSentence = leadSentence + ', 비례율이 ' + formatPct(r.rate0) + '→' + formatPct(r.rate1) + '로 ' + arrow + '합니다.';
+    const zSentence = r.Z >= 0
+      ? '조합원 1인당 평균 약 ' + toManwon(r.perMember) + '의 추가분담금이 예상됩니다.'
+      : '조합원 1인당 평균 약 ' + toManwon(Math.abs(r.perMember)) + '의 추가환급금이 예상됩니다.';
+    return rateSentence + ' ' + zSentence;
+  }
+
+  function renderResult(){
+    const s = readBaselineState();
+    const change = readChangeState();
+    const A0 = s.memberJeobun + s.memberIlban + s.memberOther;
+    const B0 = s.cost + s.etc;
+    const myAppraisalEl = document.getElementById('p_myAppraisal');
+    const myAppraisal = myAppraisalEl && myAppraisalEl.value !== '' ? toWon(myAppraisalEl.value) : null;
+
+    const r = window.RateCalc.calcScenario({
+      C: s.C, A0, B0, A1: change.A1, B1: change.B1,
+      memberCount: s.memberCount, myAppraisal,
+    });
+
+    const body = document.getElementById('resultBody');
+    if (r.rate0 == null){
+      body.innerHTML = '<div class="easy-summary">1단계 정보를 먼저 입력해주세요.</div>';
+      return;
+    }
+
+    const personalLine = (r.myZ != null)
+      ? '<div class="easy-summary" style="color:var(--accent);">회원님의 예상 ' + (r.myZ >= 0 ? '추가분담금은 약 ' + toManwon(r.myZ) : '추가환급금은 약 ' + toManwon(Math.abs(r.myZ))) + '입니다.</div>'
+      : '';
+
+    body.innerHTML =
+      '<div class="easy-summary">' + buildEasySummary(r, change) + '</div>' +
+      personalLine +
+      '<button class="detail-toggle" id="resultDetailToggle" type="button">상세보기</button>' +
+      '<table class="detail-table" id="resultDetailTable" hidden>' +
+        '<tr><td>총수입(A, 변경 전 → 후)</td><td>' + formatManwon(A0) + ' → ' + formatManwon(change.A1) + '</td></tr>' +
+        '<tr><td>총사업비(B, 변경 전 → 후)</td><td>' + formatManwon(B0) + ' → ' + formatManwon(change.B1) + '</td></tr>' +
+        '<tr><td>종전자산가액(C)</td><td>' + formatManwon(s.C) + '</td></tr>' +
+        '<tr><td>사업비 인상액(X)</td><td>' + formatManwon(r.X) + '</td></tr>' +
+        '<tr><td>수익 변동액(Y)</td><td>' + formatManwon(r.Y) + '</td></tr>' +
+        '<tr><td>추가분담금(Z = X - Y)</td><td>' + formatManwon(r.Z) + '</td></tr>' +
+        '<tr><td>조합원 1인당 평균</td><td>' + formatManwon(r.perMember) + '</td></tr>' +
+      '</table>' +
+      (window.latestContingencyReserve > 0
+        ? '<div class="reserve-note"><strong>잠재적 환급 여력 (참고용)</strong><br>예비비+미분양대책비 합계 ' + formatManwon(window.latestContingencyReserve) + '은 실제로 집행되지 않으면 향후 비례율 상승(분담금 감소) 요인이 될 수 있습니다. 단, 실집행 여부는 사업 진행 상황에 따라 다릅니다.</div>'
+        : '');
+
+    const toggleBtn = document.getElementById('resultDetailToggle');
+    toggleBtn.addEventListener('click', () => {
+      const table = document.getElementById('resultDetailTable');
+      table.hidden = !table.hidden;
+    });
+
+    renderTargetFinder(change.A1, change.B1, s.C, r.rate1, s.memberCount, r.perMember);
+    renderUnitComparisonTable(myAppraisal, r.rate1);
+  }
+
+  function buildDuesSummaryLine(perMember){
+    if (perMember == null || !Number.isFinite(perMember)) return '';
+    const label = perMember < 0 ? '환급금' : '추가분담금';
+    return '<div class="easy-summary" style="margin-top:0;">인당 조합원 ' + label + '은 ' + toManwon(Math.abs(perMember)) + ' 발생 가능할 것으로 추정됩니다.</div>';
+  }
+
+  function renderUnitComparisonTable(myAppraisal, rate1){
+    const el = document.getElementById('unitComparisonBody');
+    if (myAppraisal == null || rate1 == null){
+      el.innerHTML = '';
+      return;
+    }
+    const memberRows = Array.from(document.getElementById('a_memberRows').querySelectorAll('.unit-row'))
+      .map(row => ({
+        label: row.querySelector('.label-input').value,
+        unitPrice: toWon(row.querySelector('.price-input').value),
+      }))
+      .filter(row => row.label && row.unitPrice);
+    if (!memberRows.length){
+      el.innerHTML = '';
+      return;
+    }
+    const table = window.RateCalc.calcUnitComparisonTable(memberRows, myAppraisal, rate1);
+    el.innerHTML =
+      '<h3 style="font-size:13px;margin:14px 0 8px;">평형별 분담금 비교 (감정가 ' + formatManwon(myAppraisal) + ' 기준, 권리가액은 고정)</h3>' +
+      '<table class="detail-table">' +
+      '<tr><td><strong>평형</strong></td><td><strong>조합원분양가</strong></td><td><strong>권리가액</strong></td><td><strong>분담금</strong></td></tr>' +
+      table.map(row =>
+        '<tr><td>' + row.label + '</td><td>' + formatManwon(row.memberPrice) + '</td><td>' + formatManwon(row.rightsValue) + '</td><td>' + formatManwon(row.dues) + '</td></tr>'
+      ).join('') +
+      '</table>';
+  }
+
+  function renderTargetFinder(A1, B1, C, rate1, memberCount, perMemberDues){
+    const el = document.getElementById('targetFinderBody');
+    if (rate1 == null || !C){
+      el.innerHTML = '';
+      return;
+    }
+    const summaryLine = buildDuesSummaryLine(perMemberDues);
+    let body;
+    if (rate1 > 1.001){
+      const shift = window.RateCalc.solveReserveShiftToTarget(A1, B1, C, 1.0);
+      const perMember = memberCount ? shift / memberCount : null;
+      body =
+        '<div class="reserve-note"><strong>목표값찾기 — 비례율 ' + formatPct(rate1) + ' (100% 초과)</strong><br>' +
+        '조합은 통상 100%로 발표하고, 초과분은 예비비·미분양대책비 등 명목으로 이동 처리해 다음 단계에서 비례율을 조정하는 경우가 많습니다. 기타사업비 명목을 확인해보세요.<br>' +
+        '100%로 맞췄을 때 기타사업비로 이동 처리될 것으로 추정되는 초과분은 약 ' + formatManwon(shift) + '입니다.' +
+        (perMember != null ? ' 조합원 ' + memberCount + '명 기준, 인당 평균 약 ' + formatManwon(perMember) + '씩 기타사업비로 이동 처리되는 셈입니다.' : '') +
+        '</div>';
+    } else if (rate1 < 0.999){
+      const increase = window.RateCalc.solveMemberPriceIncreaseToTarget(A1, B1, C, 1.0);
+      const perMember = memberCount ? increase / memberCount : null;
+      body =
+        '<div class="reserve-note"><strong>목표값찾기 — 비례율 ' + formatPct(rate1) + ' (100% 미만)</strong><br>' +
+        '이대로 발표되는 경우는 드물고, 조합원분양가를 인상해 100%에 근접시키는 경우가 많습니다.<br>' +
+        '100%를 맞추려면 조합원분양가 총액을 약 ' + formatManwon(increase) + ' 인상해야 합니다.' +
+        (perMember != null ? ' 조합원 ' + memberCount + '명 기준, 인당 평균 약 ' + formatManwon(perMember) + '씩 분양가가 오르는 셈입니다.' : '') +
+        '</div>';
+    } else {
+      body = '<div class="hint" style="font-size:11.5px;color:var(--ink-faint);">비례율이 이미 100%에 근접합니다.</div>';
+    }
+    el.innerHTML = summaryLine + body;
+  }
+
+  function setupReferenceMapping(){
+    const path = document.getElementById('mappingArrowPath');
+    document.querySelectorAll('.ref-help[data-target]').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        const target = document.getElementById(el.dataset.target);
+        if (!target) return;
+        const r1 = el.getBoundingClientRect();
+        const r2 = target.getBoundingClientRect();
+        const x1 = r1.left + r1.width / 2, y1 = r1.top + r1.height / 2;
+        const x2 = r2.left + Math.min(r2.width, 24) / 2, y2 = r2.top + r2.height / 2;
+        const midY = (y1 + y2) / 2;
+        path.setAttribute('d', 'M ' + x1 + ' ' + y1 + ' C ' + x1 + ' ' + midY + ', ' + x2 + ' ' + midY + ', ' + x2 + ' ' + y2);
+        path.setAttribute('opacity', '1');
+      });
+      el.addEventListener('mouseleave', () => {
+        path.setAttribute('opacity', '0');
+      });
+    });
+  }
+  setupReferenceMapping();
+
+  document.querySelectorAll('#mainPanel input').forEach(el => {
+    el.addEventListener('input', renderResult);
+  });
+  document.querySelectorAll('#seg_ilban button, #seg_cost button').forEach(el => {
+    el.addEventListener('click', () => setTimeout(renderResult, 0));
+  });
+
+  // ---- 약식 계산 모드 (Task 38): 종전자산가액(C) 없이 공사비/수입 증감만으로 인당 증감액을 근사한다 ----
+  let simpleMode = false;
+
+  function migrateAdvancedToSimple(){
+    const s = readBaselineState();
+    document.getElementById('simple_totalCost').value = document.getElementById('a_totalCost').value;
+    document.getElementById('simple_pricePerPyeong').value = document.getElementById('a_pricePerPyeong').value;
+    document.getElementById('simple_memberIncome').value = s.memberJeobun ? window.RateCalc.wonToManwon(s.memberJeobun) : '';
+    document.getElementById('simple_generalIncome').value = s.memberIlban ? window.RateCalc.wonToManwon(s.memberIlban) : '';
+    document.getElementById('simple_memberCount').value = s.memberCount || '';
+    const rep = findRepresentativeGeneralUnit();
+    document.getElementById('simple_repPrice').value = rep ? window.RateCalc.wonToManwon(rep.unitPrice) : '';
+    document.getElementById('simple_newPricePerPyeong').value = document.getElementById('c_repNewPricePerPyeong').value;
+    document.getElementById('simple_newRepPrice').value = document.getElementById('c_repNewPrice').value;
+  }
+
+  function migrateSimpleToAdvanced(){
+    const newTotalCost = document.getElementById('simple_totalCost').value;
+    const newPricePerPyeong = document.getElementById('simple_pricePerPyeong').value;
+    document.getElementById('a_totalCost').value = newTotalCost;
+    document.getElementById('a_pricePerPyeong').value = newPricePerPyeong;
+    if (newTotalCost) markCostTriadEdited('cost');
+    if (newPricePerPyeong) markCostTriadEdited('price');
+    document.getElementById('c_repNewPricePerPyeong').value = document.getElementById('simple_newPricePerPyeong').value;
+    document.getElementById('c_repNewPrice').value = document.getElementById('simple_newRepPrice').value;
+    // 조합원분양수입/일반분양수입/조합원수/대표평형 현재가는 평형별 표 구조상 1:1 대응 필드가 없어 자동 이관되지 않는다.
+  }
+
+  function renderSimpleResult(){
+    const el = document.getElementById('simpleResultBody');
+    const totalCost = readMoneyField('simple_totalCost');
+    const pricePerPyeong = readMoneyField('simple_pricePerPyeong');
+    const generalIncome = readMoneyField('simple_generalIncome');
+    const memberCount = toNumber(document.getElementById('simple_memberCount').value);
+    const repPrice = readMoneyField('simple_repPrice');
+    const newPricePerPyeong = readMoneyField('simple_newPricePerPyeong');
+    const newRepPrice = readMoneyField('simple_newRepPrice');
+
+    if (!totalCost || !memberCount){
+      el.innerHTML = '<div class="easy-summary">총공사비와 조합원수를 입력해주세요.</div>';
+      return;
+    }
+
+    let constructionCostDelta = 0;
+    if (pricePerPyeong && newPricePerPyeong){
+      const ratePct = window.RateCalc.calcRateFromRepresentativeUnit(pricePerPyeong, newPricePerPyeong);
+      constructionCostDelta = totalCost * (ratePct / 100);
+    }
+    let incomeDelta = 0;
+    if (repPrice && newRepPrice && generalIncome){
+      const ratePct = window.RateCalc.calcRateFromRepresentativeUnit(repPrice, newRepPrice);
+      incomeDelta = generalIncome * (ratePct / 100);
+    }
+
+    const perMember = window.RateCalc.calcSimplifiedDelta(constructionCostDelta, incomeDelta, memberCount);
+    const label = perMember >= 0 ? '추가분담금' : '환급금';
+    el.innerHTML =
+      '<div class="easy-summary">인당 평균 약 ' + toManwon(Math.abs(perMember)) + '의 ' + label + ' 발생 가능할 것으로 추정됩니다.</div>' +
+      '<div class="hint" style="font-size:11.5px;color:var(--ink-faint);margin-top:6px;">※ 이 결과는 간이 계산이며, 정밀한 비례율 기반 계산은 고급 모드를 이용하세요.</div>';
+  }
+
+  function setSimpleMode(on){
+    if (on) migrateAdvancedToSimple(); else migrateSimpleToAdvanced();
+    simpleMode = on;
+    document.querySelector('.layout-grid').hidden = on;
+    document.getElementById('advancedExtras').hidden = on;
+    document.getElementById('simplifiedPanel').hidden = !on;
+    const btn = document.getElementById('simpleModeToggle');
+    btn.textContent = on ? '고급 모드로' : '약식 계산';
+    btn.classList.toggle('active', on);
+    if (on){
+      renderSimpleResult();
+    } else {
+      recomputeAll();
+      renderResult();
+    }
+  }
+
+  document.getElementById('simpleModeToggle').addEventListener('click', () => setSimpleMode(!simpleMode));
+  document.querySelectorAll(
+    '#simple_totalCost, #simple_pricePerPyeong, #simple_memberIncome, #simple_generalIncome, ' +
+    '#simple_memberCount, #simple_repPrice, #simple_newPricePerPyeong, #simple_newRepPrice'
+  ).forEach(el => el.addEventListener('input', renderSimpleResult));
+
+  // ---- 저장/불러오기(localStorage) + JSON 내보내기/불러오기 + 엑셀 내보내기 ----
+  const PROJECTS_KEY = 'rateSim_projects_v1';
+
+  function loadProjectsMap(){
+    try {
+      const raw = localStorage.getItem(PROJECTS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch(e){ return {}; }
+  }
+
+  function saveProjectsMap(map){
+    try { localStorage.setItem(PROJECTS_KEY, JSON.stringify(map)); } catch(e){}
+  }
+
+  function refreshProjectLibSelect(){
+    const sel = document.getElementById('projectLibSelect');
+    const map = loadProjectsMap();
+    const names = Object.keys(map);
+    sel.innerHTML = '<option value="">불러올 구역 선택...</option>' +
+      names.map(n => '<option value="' + n.replace(/"/g, '&quot;') + '">' + n + '</option>').join('');
+  }
+
+  function collectFullState(){
+    const readRows = (containerId) => Array.from(document.getElementById(containerId).querySelectorAll('.unit-row')).map(row => ({
+      label: row.querySelector('.label-input').value,
+      count: row.querySelector('.count-input').value,
+      price: row.querySelector('.price-input').value,
+    }));
+    return {
+      version: 1,
+      projectName: document.getElementById('projectName').value,
+      a_C: document.getElementById('a_C').value,
+      a_areaSqm: document.getElementById('a_areaSqm').value,
+      a_pricePerPyeong: document.getElementById('a_pricePerPyeong').value,
+      a_totalCost: document.getElementById('a_totalCost').value,
+      costTriadOrder: costTriadOrder.slice(),
+      a_totalExpense: document.getElementById('a_totalExpense').value,
+      a_totalIncome: document.getElementById('a_totalIncome').value,
+      repUnitOverride: repUnitOverride,
+      contingency: {
+        a_reserve: { mode: contingencyMode.a_reserve, flat: document.getElementById('a_reserve_flat').value, rate: document.getElementById('a_reserve_rate').value, years: document.getElementById('a_reserve_years').value },
+        a_unsold: { mode: contingencyMode.a_unsold, flat: document.getElementById('a_unsold_flat').value, rate: document.getElementById('a_unsold_rate').value, years: document.getElementById('a_unsold_years').value },
+        a_finance: { mode: contingencyMode.a_finance, flat: document.getElementById('a_finance_flat').value, rate: document.getElementById('a_finance_rate').value, years: document.getElementById('a_finance_years').value },
+        a_burden: { mode: contingencyMode.a_burden, flat: document.getElementById('a_burden_flat').value, rate: document.getElementById('a_burden_rate').value, years: document.getElementById('a_burden_years').value },
+      },
+      memberRows: readRows('a_memberRows'),
+      generalRows: readRows('a_generalRows'),
+      c_repNewPrice: document.getElementById('c_repNewPrice').value,
+      c_repNewPricePerPyeong: document.getElementById('c_repNewPricePerPyeong').value,
+      ilbanMode: getIlbanMode(),
+      c_ilbanInput: document.getElementById('c_ilbanInput').value,
+      c_ilbanOldPrice: document.getElementById('c_ilbanOldPrice').value,
+      c_ilbanNewPrice: document.getElementById('c_ilbanNewPrice').value,
+      costMode: getCostMode(),
+      c_costInput: document.getElementById('c_costInput').value,
+      etcMode: etcMode,
+      c_etcInput: document.getElementById('c_etcInput').value,
+      p_myAppraisal: document.getElementById('p_myAppraisal').value,
+    };
+  }
+
+  function applyFullState(state){
+    if (!state) return;
+    document.getElementById('projectName').value = state.projectName || '';
+    document.getElementById('a_C').value = state.a_C || '';
+    document.getElementById('a_areaSqm').value = state.a_areaSqm || '';
+    document.getElementById('a_pricePerPyeong').value = state.a_pricePerPyeong || '';
+    document.getElementById('a_totalCost').value = state.a_totalCost || '';
+    costTriadOrder = Array.isArray(state.costTriadOrder) ? state.costTriadOrder.slice(-2) : [];
+    document.getElementById('a_totalExpense').value = state.a_totalExpense || '';
+    document.getElementById('a_totalIncome').value = state.a_totalIncome || '';
+    repUnitOverride = state.repUnitOverride || null;
+
+    ['a_reserve', 'a_unsold', 'a_finance', 'a_burden'].forEach(prefix => {
+      const c = (state.contingency && state.contingency[prefix]) || {};
+      contingencyMode[prefix] = c.mode || 'flat';
+      document.getElementById(prefix + '_flat').value = c.flat || '';
+      document.getElementById(prefix + '_rate').value = c.rate || '';
+      document.getElementById(prefix + '_years').value = c.years || '';
+      const seg = document.getElementById('seg_' + prefix);
+      seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === contingencyMode[prefix]));
+      document.getElementById(prefix + '_flat').hidden = (contingencyMode[prefix] === 'rate');
+      document.getElementById(prefix + '_rateRow').hidden = (contingencyMode[prefix] === 'flat');
+    });
+
+    const memberRowsEl2 = document.getElementById('a_memberRows');
+    const generalRowsEl2 = document.getElementById('a_generalRows');
+    memberRowsEl2.innerHTML = '';
+    generalRowsEl2.innerHTML = '';
+    (state.memberRows || []).forEach(r => makeUnitRow(memberRowsEl2, r.label, r.count, r.price));
+    (state.generalRows || []).forEach(r => makeUnitRow(generalRowsEl2, r.label, r.count, r.price));
+
+    document.getElementById('c_repNewPrice').value = state.c_repNewPrice || '';
+    document.getElementById('c_repNewPricePerPyeong').value = state.c_repNewPricePerPyeong || '';
+
+    const ilbanSeg = document.getElementById('seg_ilban');
+    ilbanSeg._mode = state.ilbanMode || 'pct';
+    ilbanSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === ilbanSeg._mode));
+    document.getElementById('c_ilbanInput').hidden = (ilbanSeg._mode === 'unit');
+    document.getElementById('c_ilbanUnitRow').hidden = (ilbanSeg._mode !== 'unit');
+    document.getElementById('c_ilbanInput').value = state.c_ilbanInput || '';
+    document.getElementById('c_ilbanOldPrice').value = state.c_ilbanOldPrice || '';
+    document.getElementById('c_ilbanNewPrice').value = state.c_ilbanNewPrice || '';
+
+    const costSeg = document.getElementById('seg_cost');
+    costSeg._mode = state.costMode || 'pct';
+    costSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === costSeg._mode));
+    document.getElementById('c_costInput').value = state.c_costInput || '';
+
+    etcMode = state.etcMode || 'amt';
+    document.getElementById('seg_etc').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === etcMode));
+    document.getElementById('c_etcInput').value = state.c_etcInput || '';
+    document.getElementById('p_myAppraisal').value = state.p_myAppraisal || '';
+
+    recomputeAll();
+    renderResult();
+  }
+
+  // 초기화: localStorage에 저장된 다른 구역 데이터는 건드리지 않고, 현재 화면 입력값만 새 페이지 로드 시 기본 상태로 되돌린다.
+  function resetAllInputs(){
+    document.getElementById('projectName').value = '';
+    [
+      'a_C', 'a_areaSqm', 'a_pricePerPyeong', 'a_totalCost', 'a_totalExpense', 'a_totalIncome', 'p_myAppraisal',
+      'c_repNewPrice', 'c_repNewPricePerPyeong', 'c_ilbanInput', 'c_ilbanOldPrice', 'c_ilbanNewPrice', 'c_costInput', 'c_etcInput',
+      'simple_totalCost', 'simple_pricePerPyeong', 'simple_memberIncome', 'simple_generalIncome',
+      'simple_memberCount', 'simple_repPrice', 'simple_newPricePerPyeong', 'simple_newRepPrice',
+    ].forEach(id => { document.getElementById(id).value = ''; });
+
+    ['a_reserve', 'a_unsold', 'a_finance', 'a_burden'].forEach(prefix => {
+      contingencyMode[prefix] = 'flat';
+      document.getElementById(prefix + '_flat').value = '';
+      document.getElementById(prefix + '_rate').value = '';
+      document.getElementById(prefix + '_years').value = '';
+      const seg = document.getElementById('seg_' + prefix);
+      seg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === 'flat'));
+      document.getElementById(prefix + '_flat').hidden = false;
+      document.getElementById(prefix + '_rateRow').hidden = true;
+    });
+
+    const memberRowsEl3 = document.getElementById('a_memberRows');
+    const generalRowsEl3 = document.getElementById('a_generalRows');
+    memberRowsEl3.innerHTML = '';
+    generalRowsEl3.innerHTML = '';
+    ['59', '74', '84'].forEach(label => makeUnitRow(memberRowsEl3, label, '', ''));
+    ['59', '74', '84'].forEach(label => makeUnitRow(generalRowsEl3, label, '', ''));
+
+    costTriadOrder = [];
+    repUnitOverride = null;
+
+    const ilbanSeg = document.getElementById('seg_ilban');
+    ilbanSeg._mode = 'pct';
+    ilbanSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === 'pct'));
+    document.getElementById('c_ilbanInput').hidden = false;
+    document.getElementById('c_ilbanUnitRow').hidden = true;
+
+    const costSeg = document.getElementById('seg_cost');
+    costSeg._mode = 'pct';
+    costSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === 'pct'));
+
+    etcMode = 'amt';
+    document.getElementById('seg_etc').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.mode === 'amt'));
+
+    recomputeAll();
+    renderResult();
+    if (simpleMode) renderSimpleResult();
+  }
+
+  document.getElementById('btnResetAll').addEventListener('click', () => {
+    if (!confirm('현재 입력을 모두 지우고 새로 시작할까요?')) return;
+    resetAllInputs();
+    document.getElementById('saveStatus').textContent = '초기화되었습니다.';
+  });
+
+  document.getElementById('btnSaveLocal').addEventListener('click', () => {
+    const name = document.getElementById('projectName').value.trim();
+    if (!name){ alert('저장하기 전에 구역명을 입력해주세요.'); return; }
+    const map = loadProjectsMap();
+    map[name] = collectFullState();
+    saveProjectsMap(map);
+    refreshProjectLibSelect();
+    document.getElementById('projectLibSelect').value = name;
+    document.getElementById('saveStatus').textContent = '"' + name + '" 저장 완료 (' + new Date().toLocaleString('ko-KR') + ')';
+  });
+
+  document.getElementById('btnLoadLocal').addEventListener('click', () => {
+    const sel = document.getElementById('projectLibSelect');
+    const name = sel.value || document.getElementById('projectName').value.trim();
+    if (!name){ alert('불러올 구역명을 선택하거나 입력해주세요.'); return; }
+    const map = loadProjectsMap();
+    if (!map[name]){ alert('"' + name + '" 저장 기록을 찾을 수 없습니다.'); return; }
+    applyFullState(map[name]);
+    document.getElementById('saveStatus').textContent = '"' + name + '" 불러오기 완료';
+  });
+
+  document.getElementById('btnExportJson').addEventListener('click', () => {
+    const state = collectFullState();
+    const name = (state.projectName || '비례율시뮬레이터').trim();
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name + '_상태.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('btnImportJson').addEventListener('click', () => {
+    document.getElementById('importJsonInput').click();
+  });
+
+  document.getElementById('importJsonInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const state = JSON.parse(ev.target.result);
+        applyFullState(state);
+        document.getElementById('saveStatus').textContent = '"' + file.name + '" 불러오기 완료';
+      } catch(err){
+        alert('JSON 파일을 읽는 중 문제가 발생했습니다.');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('btnExportExcel').addEventListener('click', () => {
+    if (typeof XLSX === 'undefined'){
+      alert('엑셀 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해주세요.');
+      return;
+    }
+    const s = readBaselineState();
+    const change = readChangeState();
+    const myAppraisalEl = document.getElementById('p_myAppraisal');
+    const myAppraisal = myAppraisalEl.value !== '' ? toWon(myAppraisalEl.value) : null;
+    const A0 = s.memberJeobun + s.memberIlban + s.memberOther;
+    const B0 = s.cost + s.etc;
+    const r = window.RateCalc.calcScenario({ C: s.C, A0, B0, A1: change.A1, B1: change.B1, memberCount: s.memberCount, myAppraisal });
+
+    const inputAoa = [
+      ['비례율 시뮬레이터 - 입력값'],
+      [],
+      ['구역명', document.getElementById('projectName').value],
+      ['종전자산가액(C, 만원)', toNumber(document.getElementById('a_C').value)],
+      ['연면적(㎡)', toNumber(document.getElementById('a_areaSqm').value)],
+      ['평당 공사비(만원)', toNumber(document.getElementById('a_pricePerPyeong').value)],
+      ['총공사비(만원)', toNumber(document.getElementById('a_totalCost').value)],
+      ['총지출(만원)', toNumber(document.getElementById('a_totalExpense').value)],
+      ['총수입(만원)', toNumber(document.getElementById('a_totalIncome').value)],
+      [],
+      ['[조합원분양 평형별]'],
+      ['평형', '세대수', '세대당 분양가(만원)'],
+    ];
+    Array.from(document.getElementById('a_memberRows').querySelectorAll('.unit-row')).forEach(row => {
+      inputAoa.push([row.querySelector('.label-input').value, toNumber(row.querySelector('.count-input').value), toNumber(row.querySelector('.price-input').value)]);
+    });
+    inputAoa.push([], ['[일반분양 평형별]'], ['평형', '세대수', '세대당 분양가(만원)']);
+    Array.from(document.getElementById('a_generalRows').querySelectorAll('.unit-row')).forEach(row => {
+      inputAoa.push([row.querySelector('.label-input').value, toNumber(row.querySelector('.count-input').value), toNumber(row.querySelector('.price-input').value)]);
+    });
+    inputAoa.push(
+      [], ['[변경값]'],
+      ['일반분양 예상 변경 후 분양가(만원)', document.getElementById('c_repNewPrice').value],
+      ['예상 평당공사비(만원)', document.getElementById('c_repNewPricePerPyeong').value],
+      ['기타사업비 변경액(만원)', document.getElementById('c_etcInput').value],
+      ['감정가(만원)', document.getElementById('p_myAppraisal').value]
+    );
+
+    const resultAoa = [
+      ['비례율 시뮬레이터 - 계산결과'],
+      [],
+      ['기존 비례율', r.rate0 != null ? (r.rate0 * 100).toFixed(2) + '%' : '-'],
+      ['변경 후 비례율', r.rate1 != null ? (r.rate1 * 100).toFixed(2) + '%' : '-'],
+      ['조합원 1인당 평균 ' + (r.perMember >= 0 ? '추가분담금' : '환급금') + '(만원)', r.perMember != null ? Math.round(Math.abs(r.perMember) / 10000) : '-'],
+    ];
+    if (myAppraisal != null && r.rate1 != null){
+      const memberRowsForTable = Array.from(document.getElementById('a_memberRows').querySelectorAll('.unit-row'))
+        .map(row => ({ label: row.querySelector('.label-input').value, unitPrice: toWon(row.querySelector('.price-input').value) }))
+        .filter(row => row.label && row.unitPrice);
+      if (memberRowsForTable.length){
+        const table = window.RateCalc.calcUnitComparisonTable(memberRowsForTable, myAppraisal, r.rate1);
+        resultAoa.push([], ['[평형별 분담금 비교 (감정가 기준)]'], ['평형', '조합원분양가(만원)', '권리가액(만원)', '분담금(만원)']);
+        table.forEach(row => {
+          resultAoa.push([row.label, window.RateCalc.wonToManwon(row.memberPrice), window.RateCalc.wonToManwon(row.rightsValue), window.RateCalc.wonToManwon(row.dues)]);
+        });
+      }
+    }
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(inputAoa), '입력값');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resultAoa), '계산결과');
+    const filename = (document.getElementById('projectName').value.trim() || '비례율시뮬레이터') + '_결과.xlsx';
+    XLSX.writeFile(wb, filename);
+  });
+
+  attachThousandsFormattingAll([
+    '#a_C', '#a_pricePerPyeong', '#a_totalCost', '#a_totalExpense', '#a_totalIncome',
+    '#a_reserve_flat', '#a_unsold_flat', '#a_finance_flat', '#a_burden_flat',
+    '#c_repNewPrice', '#c_repNewPricePerPyeong',
+    '#c_ilbanInput', '#c_ilbanOldPrice', '#c_ilbanNewPrice', '#c_costInput', '#c_etcInput',
+    '#p_myAppraisal',
+    '#simple_totalCost', '#simple_pricePerPyeong', '#simple_memberIncome', '#simple_generalIncome',
+    '#simple_repPrice', '#simple_newPricePerPyeong', '#simple_newRepPrice',
+  ].join(','));
+
+  refreshProjectLibSelect();
+  recomputeAll();
+  renderResult();
+
+  window.toNumber = toNumber;
+  window.toWon = toWon;
+  window.readBaselineState = readBaselineState;
+  window.formatManwon = formatManwon;
+  window.formatPct = formatPct;
+  window.recomputeAll = recomputeAll;
+  window.readChangeState = readChangeState;
+  window.renderResult = renderResult;
+})();
+</script>
+</body>
+</html>

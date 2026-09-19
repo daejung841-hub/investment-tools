@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "investment-tools",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["nocache_server.py", "8890"],
+      "port": 8890
+    }
+  ]
+}

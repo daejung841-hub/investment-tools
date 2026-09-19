@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>투자 도구 모음</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<script src="config.js"></script>
+<script src="gate.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#F4F6F8; --surface:#FFFFFF; --surface-alt:#EDF2F4;
+  --border:#DCE3E9; --border-strong:#C6D0D7;
+  --ink:#182430; --ink-muted:#61707D; --ink-faint:#93A1AC;
+  --accent:#0E5C6B; --accent-soft:#E4F0F1; --accent-ink:#FFFFFF;
+  --good:#1E8E5A; --good-bg:#E5F5EC;
+  --bad:#C63F3F; --bad-bg:#FBEAEA;
+  --neutral-bg:#EDF1F4;
+  --shadow:0 1px 2px rgba(24,36,48,.06), 0 6px 16px -10px rgba(24,36,48,.18);
+  --font-display:'Noto Serif KR', ui-serif, 'Nanum Myeongjo', serif;
+  --font-body:'Noto Sans KR', ui-sans-serif, -apple-system, 'Malgun Gothic', sans-serif;
+  --font-mono:'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#12181D; --surface:#1A2229; --surface-alt:#1F2830;
+    --border:#2B3841; --border-strong:#3A4750;
+    --ink:#E7ECEF; --ink-muted:#9AAAB4; --ink-faint:#657580;
+    --accent:#4FBAC6; --accent-soft:#193338; --accent-ink:#0B1418;
+    --good:#3FD495; --good-bg:#123328;
+    --bad:#FF7A7A; --bad-bg:#3A1D1D;
+    --neutral-bg:#232D35;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 24px -14px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#12181D; --surface:#1A2229; --surface-alt:#1F2830;
+  --border:#2B3841; --border-strong:#3A4750;
+  --ink:#E7ECEF; --ink-muted:#9AAAB4; --ink-faint:#657580;
+  --accent:#4FBAC6; --accent-soft:#193338; --accent-ink:#0B1418;
+  --good:#3FD495; --good-bg:#123328;
+  --bad:#FF7A7A; --bad-bg:#3A1D1D;
+  --neutral-bg:#232D35;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 24px -14px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14.5px;line-height:1.55;}
+.wrap{max-width:960px;margin:0 auto;padding:22px clamp(16px,2vw,28px) 60px;}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;margin:0;}
+button,input{font-family:inherit;font-size:inherit;color:inherit;}
+button{cursor:pointer;}
+.topbar{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:28px;flex-wrap:wrap;}
+.topbar h1{font-size:clamp(20px,2.6vw,27px);font-weight:700;letter-spacing:-.01em;}
+.topbar .sub{color:var(--ink-muted);font-size:13px;margin-top:4px;}
+.btn{border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-muted);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;transition:border-color .15s, color .15s, background .15s;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* 비밀번호 게이트 */
+#gateScreen{max-width:380px;margin:80px auto 0;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:28px 26px;text-align:center;}
+#gateScreen h2{font-size:17px;margin-bottom:6px;}
+#gateScreen p{color:var(--ink-muted);font-size:12.5px;margin:0 0 18px;}
+#gateForm{display:flex;flex-direction:column;gap:10px;}
+#gatePassword{border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--ink);border-radius:8px;padding:10px 12px;font-family:var(--font-mono);font-size:14px;text-align:center;}
+#gateSubmit{border:none;background:var(--accent);color:var(--accent-ink);padding:10px 12px;border-radius:8px;font-weight:700;font-size:13.5px;}
+#gateError{color:var(--bad);font-size:12px;min-height:16px;margin-top:4px;}
+
+/* 카드 그리드 */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:16px;}
+.tool-card{display:block;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:22px 20px;text-decoration:none;color:inherit;transition:transform .12s, border-color .12s;position:relative;}
+.tool-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.tool-card h3{font-size:16px;font-weight:700;margin-bottom:8px;}
+.tool-card p{color:var(--ink-muted);font-size:12.5px;margin:0;line-height:1.6;}
+.tool-card .badge{display:inline-block;margin-top:12px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;background:var(--good-bg);color:var(--good);}
+.tool-card.disabled{opacity:.5;cursor:not-allowed;pointer-events:none;}
+.tool-card.disabled .badge{background:var(--neutral-bg);color:var(--ink-faint);}
+[hidden]{display:none !important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="gateScreen">
+    <h2>🔒 접속 확인</h2>
+    <p>비밀번호를 입력하면 도구 목록을 볼 수 있습니다.</p>
+    <form id="gateForm">
+      <input type="password" id="gatePassword" placeholder="비밀번호" autocomplete="off">
+      <button type="submit" id="gateSubmit">입장하기</button>
+      <div id="gateError"></div>
+    </form>
+  </div>
+
+  <div id="mainScreen" hidden>
+    <div class="topbar">
+      <div>
+        <h1>투자 도구 모음</h1>
+        <div class="sub">재개발·재건축 투자 분석용 계산기 모음입니다</div>
+      </div>
+      <button class="btn" id="themeToggle" type="button">다크모드</button>
+    </div>
+
+    <div class="card-grid">
+      <a class="tool-card" href="benchmark-calculator/벤치마크_배율_계산기.html">
+        <h3>저평가 단지 계산기</h3>
+        <p>대장 단지 대비 매매·전세 배율로 이론적 성장가를 역산해 저평가·고평가 단지를 진단합니다.</p>
+        <span class="badge">바로가기</span>
+      </a>
+
+      <a class="tool-card" href="rate-simulator/비례율_시뮬레이터.html">
+        <h3>비례율 시뮬레이터</h3>
+        <p>공사비·분양가 변경이 비례율과 추가분담금에 미치는 영향을 계산합니다.</p>
+        <span class="badge">바로가기</span>
+      </a>
+
+      <a class="tool-card" href="benchmark-calculator/급지표.html">
+        <h3>급지표</h3>
+        <p>가격대별 단지를 지역·구간별로 한눈에 훑어보고, 계산기로 바로 넘길 수 있습니다.</p>
+        <span class="badge">바로가기</span>
+      </a>
+
+      <div class="tool-card disabled">
+        <h3>재개발 목록표</h3>
+        <p>전국 재개발·재건축 구역 현황을 목록으로 정리해 보여줄 예정입니다.</p>
+        <span class="badge">준비중</span>
+      </div>
+
+      <div class="tool-card disabled">
+        <h3>시세보정 계산기</h3>
+        <p>시점·층·향 등 개별 요인을 반영해 시세를 보정하는 도구를 준비 중입니다.</p>
+        <span class="badge">준비중</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const themeToggle = document.getElementById('themeToggle');
+  if (themeToggle){
+    themeToggle.addEventListener('click', () => {
+      const root = document.documentElement;
+      const isDark = root.getAttribute('data-theme') === 'dark';
+      root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    });
+  }
+
+  function showMain(){
+    document.getElementById('gateScreen').hidden = true;
+    document.getElementById('mainScreen').hidden = false;
+  }
+
+  if (isSiteAuthed()){
+    showMain();
+  }
+
+  document.getElementById('gateForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const input = document.getElementById('gatePassword');
+    const errorEl = document.getElementById('gateError');
+    if (input.value === SITE_PASSWORD){
+      grantSiteAuth();
+      errorEl.textContent = '';
+      showMain();
+    } else {
+      errorEl.textContent = '비밀번호가 올바르지 않습니다.';
+      input.value = '';
+      input.focus();
+    }
+  });
+})();
+</script>
+</body>
+</html>
