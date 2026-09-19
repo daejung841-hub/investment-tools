@@ -373,6 +373,29 @@ run('calcUnitComparisonTable: 감정가가 없으면(0) 권리가액도 0이다'
   assert.strictEqual(table[0].dues, 400);
 });
 
+run('calcMemberPriceIncreaseTable: 인상액을 기존 조합원분양수입 대비 비율로 환산해 모든 평형에 동일 적용한다', () => {
+  const rows = [
+    { label: '59', unitPrice: 400 },
+    { label: '84', unitPrice: 500 },
+  ];
+  // 기존 조합원분양수입 1000, 인상 필요액 100 -> 10% 인상
+  const table = window.RateCalc.calcMemberPriceIncreaseTable(rows, 1000, 0.9, 100, 1000);
+  assert.ok(Math.abs(table[0].newPrice - 440) < 1e-6, `newPrice=${table[0].newPrice}`);
+  assert.ok(Math.abs(table[1].newPrice - 550) < 1e-6, `newPrice=${table[1].newPrice}`);
+});
+
+run('calcMemberPriceIncreaseTable: 기존 분담금은 현재 비례율 기준, 변경 분담금은 100% 기준 권리가액을 쓴다', () => {
+  const rows = [{ label: '59', unitPrice: 400 }];
+  const table = window.RateCalc.calcMemberPriceIncreaseTable(rows, 1000, 0.9, 100, 1000);
+  assert.strictEqual(table[0].oldDues, 400 - 1000 * 0.9); // -500
+  assert.ok(Math.abs(table[0].newDues - (440 - 1000 * 1.0)) < 1e-6, `newDues=${table[0].newDues}`); // -560
+});
+
+run('calcMemberPriceIncreaseTable: 기존 조합원분양수입이 0이면 인상 비율도 0이다(가격 그대로)', () => {
+  const table = window.RateCalc.calcMemberPriceIncreaseTable([{ label: '59', unitPrice: 400 }], 1000, 0.9, 100, 0);
+  assert.strictEqual(table[0].newPrice, 400);
+});
+
 // --- Task 32: 연면적/평당공사비/총공사비 3원 순환 자동계산 (calcTotalConstructionCost의 역함수 2개) ---
 run('calcAreaFromCost: calcTotalConstructionCost의 역함수다 (round-trip)', () => {
   const cost = window.RateCalc.calcTotalConstructionCost(137293.51, 5830000);

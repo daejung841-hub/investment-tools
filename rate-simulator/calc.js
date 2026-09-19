@@ -127,12 +127,30 @@
     }));
   }
 
+  // 목표값찾기 "B안": 조합원분양가 인상 필요액(increaseWon)을 기존 조합원분양수입(totalMemberIncomeWon)
+  // 대비 비율로 환산해, 모든 평형에 동일 비율로 적용했을 때의 평형별 변경 전/후 분양가·분담금을 계산한다.
+  function calcMemberPriceIncreaseTable(unitRows, myAppraisal, currentRate, increaseWon, totalMemberIncomeWon){
+    const ratio = totalMemberIncomeWon ? increaseWon / totalMemberIncomeWon : 0;
+    const rightsCurrent = myAppraisal * currentRate;
+    const rights100 = myAppraisal * 1.0;
+    return (unitRows || []).map(row => {
+      const newPrice = row.unitPrice * (1 + ratio);
+      return {
+        label: row.label,
+        oldPrice: row.unitPrice,
+        newPrice,
+        oldDues: row.unitPrice - rightsCurrent,
+        newDues: newPrice - rights100,
+      };
+    });
+  }
+
   const api = {
     calcProportion, calcScenario, sumUnitRows, pctToAmount, amountToPct,
     manwonToWon, wonToManwon, calcTotalConstructionCost, calcOtherIncome, calcOtherExpense,
     calcSalesPriceChange, calcContingencyReserve, calcRateFromRepresentativeUnit,
     calcAverageMultiplier, calcPyeong, solveReserveShiftToTarget, solveMemberPriceIncreaseToTarget,
-    calcUnitComparisonTable, calcAreaFromCost, calcPricePerPyeongFromCost,
+    calcUnitComparisonTable, calcMemberPriceIncreaseTable, calcAreaFromCost, calcPricePerPyeongFromCost,
     calcOtherExpenseChangeFromRate, calcSimplifiedDelta,
   };
   if (typeof module !== 'undefined' && module.exports){
