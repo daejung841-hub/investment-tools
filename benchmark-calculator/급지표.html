@@ -12,6 +12,13 @@
     --badge-bg:#eef2ff; --badge-text:#3949ab;
   }
   body{ margin:0; font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); }
+  /* feedback-widget.js는 여러 계산기가 공유하는 파일이라 직접 고치지
+     않고(건드리면 재개발목록표/시세보정계산기/저평가단지계산기/
+     비례율계산기 전부 영향받음), 이 페이지에서만 .fw-fab 위치를
+     !important로 덮어쓴다(2026-09 세션) — 우측 하단 고정(right:20px;
+     bottom:20px)이 급지표의 하단 고정바(.bottom-bar, 시세비교 버튼)와
+     겹쳐서 클릭이 불편하다는 피드백으로, 페이지 우측 상단으로 옮긴다. */
+  .fw-fab{ top:14px !important; bottom:auto !important; right:20px !important; }
   .header{ padding:16px 20px 4px; }
   .header h1{ font-size:20px; margin:0 0 4px; }
   .header .criteria{ font-size:13px; color:var(--muted); }
