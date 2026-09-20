@@ -345,6 +345,16 @@ textarea{
 .card-head{display:flex;align-items:center;gap:8px;}
 .card-head .swatch{width:11px;height:11px;border-radius:50%;flex:none;}
 .card-head .name{font-weight:700;font-size:14.5px;flex:1;}
+/* 진단요약 카드 "선도단지 기준 / 기준단지 기준" 토글(2026-09 세션) —
+   .top-mode-btn(화면 상단 탭)과 같은 세그먼트 버튼 개념이지만, 카드 안
+   좁은 공간에 들어가므로 훨씬 작게 만든다. */
+.frame-toggle{display:flex;gap:4px;margin:8px 0 2px;}
+.frame-btn{
+  padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:var(--surface);
+  font-size:10.5px;font-weight:600;color:var(--ink-faint);cursor:pointer;
+}
+.frame-btn.active{background:var(--accent-soft);color:var(--accent);border-color:var(--accent);}
+.frame-btn:disabled{cursor:default;opacity:.5;}
 .badge{
   align-self:flex-start;padding:4px 12px;border-radius:999px;font-weight:700;font-size:12.5px;letter-spacing:.01em;
 }
@@ -363,8 +373,13 @@ textarea{
 .fair-price-summary-card.tone-warn .fair-price-summary-body{color:var(--warn);}
 .fair-price-summary-card.tone-neutral .fair-price-summary-body{color:var(--ink-muted);}
 .stat-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;flex-wrap:nowrap;}
-.stat-row .k{color:var(--ink-muted);white-space:nowrap;}
-.stat-row .v{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+/* 항목(2026-09 세션, 매매배율/갭 등에 설명 아이콘 추가) — .k에 info-icon이
+   붙으면서 라벨 자체의 최소 폭(min-content)이 넓어져, white-space:nowrap +
+   flex-wrap:nowrap 조합에서 .v(수치)가 카드 밖으로 밀려나 안 보이는 문제가
+   있었다(실측 확인). .k만 줄바꿈을 허용하고(min-width:0으로 flex 축소
+   가능하게) .v는 그대로 한 줄 고정폭을 유지해 숫자가 잘리지 않게 한다.*/
+.stat-row .k{color:var(--ink-muted);white-space:normal;flex:1 1 auto;min-width:0;}
+.stat-row .v{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;flex:none;}
 .stat-row .v.ratio-val{font-size:15px;font-weight:700;letter-spacing:.015em;}
 .stat-row.price-highlight{padding-bottom:8px;margin-bottom:2px;border-bottom:1px dashed var(--border);}
 .stat-row.price-highlight .k{font-weight:600;}
@@ -3355,6 +3370,13 @@ const TWIN_CATEGORY_LEGEND =
     '<span>🎯 갭메우기 이력 = 그 단지가 서울 선도단지 대비 과거에도 벌어졌다 정상화된 적 있음(기준단지와의 관계 아님)</span>'+
     '<span>ℹ️ 이 분류는 "위쪽 준거단지"(동조율 추정에 쓰인 단지) 선정과는 다른 기준입니다 — 준거단지는 "우리 단지와 얼마나 닮았는지", 여기 갭메우기 이력은 "그 단지 자체가 선도단지 대비 벌어졌다 좁혀진 적 있는지"를 봅니다. 같은 단지가 두 곳에서 다르게(또는 같게) 보일 수 있습니다.</span>'+
   '</div>';
+// 진단요약 카드 "선도단지 기준 / 기준단지 기준" 토글 상태(2026-09 세션) —
+// key(frameKey = kTag+'-'+i) -> 'bench'|'base'. 카드별로 독립 관리해야
+// 하므로(요청사항) 전역 단일 상태가 아니라 카드 키 단위 Map을 쓴다.
+// 페이지 새로고침 시 초기화되는 건 의도된 동작 — openTwinRows 등 다른
+// 카드 UI 상태도 마찬가지로 세션 상태(state.compares 등)에 포함하지
+// 않는다.
+const diagFrameMap = new Map();
 const openTwinRows = new Set();
 const twinPageState = new Map(); // key(twinKey) -> "더보기" 안에서의 현재 페이지 번호
 const twinMoreOpen = new Set(); // key(twinKey) -> "더보기" 펼침 여부
@@ -4584,8 +4606,24 @@ function gasPushEntry(entry){
 function toneBadge(diag){
   return '<span class="badge '+diag.tone+'">'+diag.badge+'</span>';
 }
+// 매매배율/매매갭/전세배율/전세갭 설명 툴팁(2026-09 세션) — 기존 시세표
+// 헤더 툴팁(RECENT_TABLE_COL_TOOLTIP_HTML)과 같은 "배지형 키워드 강조"
+// 스타일(.tip-kv)을 그대로 재사용한다. label(선도단지/기준단지)에 따라
+// 문구가 달라지므로 상수가 아니라 함수로 둔다 — "선도단지 기준/기준단지
+// 기준" 토글이 바뀔 때마다 buildDiagCardBody가 새로 호출해 재생성한다.
+function ratioStatTooltipIcon(label, desc){
+  return '<span class="info-icon" tabindex="0"><span class="info-tip-html"><div class="tip-kv"><b>'+esc(label)+'</b><span>'+esc(desc)+'</span></div></span>ⓘ</span>';
+}
+function buildRatioStatTooltips(frameLabel){
+  return {
+    saleRatio: ratioStatTooltipIcon('매매 배율', frameLabel+' 대비 이 단지의 매매가 비율입니다(현재 / 과거 평균).'),
+    saleGap: ratioStatTooltipIcon('매매 갭', frameLabel+' 현재 시세에 평균 배율을 적용했을 때와의 실제 가격 차이입니다.'),
+    jeonseRatio: ratioStatTooltipIcon('전세 배율', frameLabel+' 대비 이 단지의 전세가 비율입니다(현재 / 과거 평균).'),
+    jeonseGap: ratioStatTooltipIcon('전세 갭', frameLabel+' 현재 전세 시세에 평균 배율을 적용했을 때와의 실제 가격 차이입니다.'),
+  };
+}
 
-function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, keyTag, inlineSyncCard, headBadgeHtml, baseCompareHtml){
+function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, keyTag, inlineSyncCard, headBadgeHtml, baseCompareHtml, baseIsSameAsCompBench){
   // keyTag: openTwinRows/twinPageState/chartModeState 등 전역 Map/Set의 키 네임스페이스.
   // 생략 시 기존처럼 (wide?'t':'c')를 쓴다. "우리 단지 진단하기" 탭은 항상 i=0,
   // wide=false로 호출되어 다중비교 카드 0번과 키가 겹치므로 's'를 넘겨 분리한다
@@ -4716,11 +4754,8 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   // 배지와 선도단지 기준 헤드라인 문장이 서로 다른 방향을 가리켜("적정"
   // 배지 바로 아래 "8% 싸게 거래 중, 상승 여력" 문장) 모순돼 보이는 버그를
   // 발견했다 — 배지도 반드시 같은 기준(rVsOwnBench)을 따르게 맞춘다.
-  // 아래 statsHtml·상세보기(wrapDetail)는 여전히 r(고른 기준단지 대비)을
-  // 그대로 써서 "내가 고른 기준단지와 비교하면 구체적으로 어떤지"를 보여준다
-  // — 이건 선도단지 헤드라인과 별개의 유효한 정보라 그대로 둔다. comp가
-  // 선도단지 그 자신이면(가상 벤치마크) 비교 대상이 없으므로 r 기준 판정을
-  // 그대로 쓴다.
+  // comp가 선도단지 그 자신이면(가상 벤치마크) 비교 대상이 없으므로 r
+  // 기준 판정을 그대로 쓴다.
   let rVsOwnBench = null;
   if (!comp.isVirtualBenchmark){
     const ownBenchGroup = pickBenchGroupForTarget(comp.name).groupKey;
@@ -4730,29 +4765,51 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
       if (!candidate.error) rVsOwnBench = candidate;
     }
   }
-  const unifiedSummary = rVsOwnBench ? buildUnifiedSummaryText(rVsOwnBench) : null;
-  const headlineDiag = (rVsOwnBench && unifiedSummary) ? rVsOwnBench.diag : r.diag;
-  const headHtml = '<div class="card-head"><span class="swatch" style="background:var('+(SLOT_COLORS[i]||'--series-base')+')"></span><span class="name">'+esc(comp.name)+esc(complexMetaLabel(comp.name))+'</span>'+(headBadgeHtml||'')+'</div>'+toneBadge(headlineDiag);
+  // "선도단지 기준 / 기준단지 기준" 토글(2026-09 세션) — 예전엔 배지·헤드라인은
+  // 항상 rVsOwnBench(선도단지 대비), 배율/갭 수치·상세문구는 항상 r(고른
+  // 기준단지 대비)로 고정 분리돼 있어서, 한 카드 안에서 서로 다른 기준의
+  // 숫자가 동시에 보이는 게 오히려 헷갈린다는 지적을 받았다. 이제 사용자가
+  // 카드별로 골라 배지·헤드라인·배율·갭·상세문구 전부를 한 기준으로 통일해
+  // 볼 수 있게 한다. base가 comp 자신의 선도단지와 같으면(baseIsSameAsCompBench)
+  // r과 rVsOwnBench가 사실상 같은 값이라 토글 자체를 비활성화한다 — 두
+  // 옵션이 항상 같은 결과를 내는데 고를 수 있게 두면 오히려 혼란만 준다.
+  const canToggleFrame = !!rVsOwnBench && !baseIsSameAsCompBench;
+  const frameKey = kTag+'-'+i;
+  const frame = canToggleFrame ? (diagFrameMap.get(frameKey) || 'bench') : 'bench';
+  const activeR = (frame === 'base') ? r : (rVsOwnBench || r);
+  const frameLabel = frame === 'base' ? '기준단지' : '선도단지';
+  const unifiedSummary = buildUnifiedSummaryText(activeR, frameLabel);
+  const headlineDiag = activeR.diag;
+  const frameToggleHtml = canToggleFrame
+    ? '<div class="frame-toggle" data-frame-toggle="'+esc(frameKey)+'">'+
+        '<button class="frame-btn'+(frame==='bench'?' active':'')+'" data-frame="bench">선도단지 기준</button>'+
+        '<button class="frame-btn'+(frame==='base'?' active':'')+'" data-frame="base">기준단지 기준</button>'+
+      '</div>'
+    : '';
+  const headHtml = '<div class="card-head"><span class="swatch" style="background:var('+(SLOT_COLORS[i]||'--series-base')+')"></span><span class="name">'+esc(comp.name)+esc(complexMetaLabel(comp.name))+'</span>'+(headBadgeHtml||'')+'</div>'+frameToggleHtml+toneBadge(headlineDiag);
   // 항목 3(2026-09-21 세션) — 배율(%)만 보여주면 실제 금액 감이 바로 안
   // 온다는 지적을 받아, 매매 배율/갭 바로 위에 "현재가 / 적정가" 실제
   // 금액을 한 줄로 추가한다. buildFairPriceSummaryCard의 "적정가는 N억로
   // 추정됩니다" 문장과 같은 근거(r.fairSale)를 재사용하므로 숫자가
   // 서로 어긋나지 않는다 — 그 문장은 그대로 두고, 여기는 훑어보기 쉬운
-  // 숫자만 간결하게 보여주는 역할로 분리한다.
-  const priceHighlightHtml = (r.curSalePrice!=null || r.fairSale!=null)
-    ? '<div class="stat-row price-highlight"><span class="k">현재가 / 적정가</span><span class="v">'+fmtEok(r.curSalePrice)+' / '+fmtEok(r.fairSale)+'</span></div>'
+  // 숫자만 간결하게 보여주는 역할로 분리한다. 위 토글에 맞춰 activeR을
+  // 쓴다(2026-09 세션) — base와 다른 기준을 고르면 이 카드 전체가 그
+  // 기준의 숫자로 통일돼 보인다.
+  const ratioTips = buildRatioStatTooltips(frameLabel);
+  const priceHighlightHtml = (activeR.curSalePrice!=null || activeR.fairSale!=null)
+    ? '<div class="stat-row price-highlight"><span class="k">현재가 / 적정가</span><span class="v">'+fmtEok(activeR.curSalePrice)+' / '+fmtEok(activeR.fairSale)+'</span></div>'
     : '';
   const statsHtml = priceHighlightHtml+
-    '<div class="stat-row"><span class="k">매매 배율 (현재 / 평균)</span><span class="v">'+fmtPct(r.currentSaleRatio)+' / '+fmtPct(r.avgSaleRatio)+'</span></div>'+
-    '<div class="stat-row"><span class="k">매매 갭</span><span class="v '+(r.saleGap>0?'down':(r.saleGap<0?'up':''))+'">'+fmtEok(r.saleGap)+fmtGapPct(r.saleGap, r.curSalePrice)+'</span></div>'+
-    '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균)</span><span class="v">'+fmtPct(r.currentJeonseRatio)+' / '+fmtPct(r.avgJeonseRatio)+'</span></div>'+
-    '<div class="stat-row"><span class="k">전세 갭</span><span class="v '+(r.jeonseGap>0?'down':(r.jeonseGap<0?'up':''))+'">'+fmtEok(r.jeonseGap)+fmtGapPct(r.jeonseGap, r.curJeonsePrice)+'</span></div>';
+    '<div class="stat-row"><span class="k">매매 배율 (현재 / 평균) '+ratioTips.saleRatio+'</span><span class="v">'+fmtPct(activeR.currentSaleRatio)+' / '+fmtPct(activeR.avgSaleRatio)+'</span></div>'+
+    '<div class="stat-row"><span class="k">매매 갭 '+ratioTips.saleGap+'</span><span class="v '+(activeR.saleGap>0?'down':(activeR.saleGap<0?'up':''))+'">'+fmtEok(activeR.saleGap)+fmtGapPct(activeR.saleGap, activeR.curSalePrice)+'</span></div>'+
+    '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균) '+ratioTips.jeonseRatio+'</span><span class="v">'+fmtPct(activeR.currentJeonseRatio)+' / '+fmtPct(activeR.avgJeonseRatio)+'</span></div>'+
+    '<div class="stat-row"><span class="k">전세 갭 '+ratioTips.jeonseGap+'</span><span class="v '+(activeR.jeonseGap>0?'down':(activeR.jeonseGap<0?'up':''))+'">'+fmtEok(activeR.jeonseGap)+fmtGapPct(activeR.jeonseGap, activeR.curJeonsePrice)+'</span></div>';
   const compRatioStats = computeSelfRatioStats(comp);
   const compEligibility = jeonseRatioDiagnosisEligible(findBuiltYear(comp.name), compRatioStats, state.threshold);
   const ratioSentence = compEligibility.eligible
-    ? jeonseRatioContextSentence(r.diag.badge, compRatioStats, state.threshold) + (compEligibility.note ? ' '+compEligibility.note : '')
+    ? jeonseRatioContextSentence(activeR.diag.badge, compRatioStats, state.threshold) + (compEligibility.note ? ' '+compEligibility.note : '')
     : compEligibility.reason;
-  const msgHtml = '<div class="card-msg easy-summary">'+esc(unifiedSummary || headlineDiag.easyMessage||headlineDiag.message)+'</div>'+wrapDetail(r.diag.message+' '+ratioSentence);
+  const msgHtml = '<div class="card-msg easy-summary">'+esc(unifiedSummary || headlineDiag.easyMessage||headlineDiag.message)+'</div>'+wrapDetail(activeR.diag.message+' '+ratioSentence);
   const twinKey = 'twin-'+kTag+'-'+i;
   // 실측 동조율 카드는 처음 렌더링될 때만 쌍둥이 단지 섹션을 기본 펼침하고
   // 상위 3개로 제한한다 — 이미 기본값을 적용한 적 있으면(twinDefaultOpened)
@@ -4890,16 +4947,23 @@ function buildFairPriceSummaryCard(r){
 // 사용자가 어떤 기준단지를 고르든 흔들리지 않는다(항목 2-2: 예전에
 // 있다가 사라진 "선도단지 대비 약 N% 저평가" 문구를 이 템플릿에 다시
 // 녹여 복원).
-function buildUnifiedSummaryText(rVsBench){
+// label(2026-09 세션, "선도단지 기준/기준단지 기준" 토글 항목) — 기존엔
+// rVsBench가 항상 comp 자신의 진짜 선도단지 대비 결과라는 전제로 "선도단지"를
+// 하드코딩했다. 토글이 "기준단지 기준"일 때는 이 함수에 r(화면에서 고른
+// 기준단지 대비 computeSlot 결과)를 그대로 넘기고 label만 "기준단지"로
+// 바꿔 재사용한다 — diag 판정 로직(tone/saleDiff/fairSale)은 어느 쪽
+// computeSlot 결과든 동일한 필드 구조라 그대로 재사용 가능하다.
+function buildUnifiedSummaryText(rVsBench, label){
+  label = label || '선도단지';
   if (!rVsBench || rVsBench.error || rVsBench.saleDiff == null || rVsBench.fairSale == null) return null;
   const tone = rVsBench.diag.tone;
   if (tone !== 'good' && tone !== 'bad'){
-    return '현재 선도단지 대비 평균 범위 안에서 거래되고 있습니다. 선도단지와의 과거 배율로 추정한 적정가는 '+fmtEok(rVsBench.fairSale)+'입니다.';
+    return '현재 '+label+' 대비 평균 범위 안에서 거래되고 있습니다. '+label+'와의 과거 배율로 추정한 적정가는 '+fmtEok(rVsBench.fairSale)+'입니다.';
   }
   const diff = rVsBench.saleDiff;
   const dirWord = diff < 0 ? '싸게' : '비싸게';
   const nextWord = diff < 0 ? '상승' : '조정';
-  return '현재 선도단지 대비 '+Math.abs(diff).toFixed(0)+'% 만큼 '+dirWord+' 거래 중입니다. 선도단지와의 과거 배율로 추정한 적정가는 '+fmtEok(rVsBench.fairSale)+'으로 추정되고, 추가 '+nextWord+' 가능성이 있습니다.';
+  return '현재 '+label+' 대비 '+Math.abs(diff).toFixed(0)+'% 만큼 '+dirWord+' 거래 중입니다. '+label+'와의 과거 배율로 추정한 적정가는 '+fmtEok(rVsBench.fairSale)+'으로 추정되고, 추가 '+nextWord+' 가능성이 있습니다.';
 }
 // 선도단지 자체의 현재 위치 카드 — M2 대비 위치(computeBenchmarkOvershoot)와
 // 전세가율 자기이탈(computeSelfRatioStats)을 나란히 보여주되, 서로 다른
@@ -5128,7 +5192,10 @@ function renderSingleDiag(name){
     '</div>';
   const card = document.getElementById('singleDiagCard');
   const syncCardEl = document.getElementById('singleDiagSyncCard');
-  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true);
+  // "우리 단지 진단하기" 탭은 base가 항상 target 자신의 진짜 선도단지라
+  // r과 rVsOwnBench가 사실상 같은 값이다 — 토글을 강제로 비활성화한다
+  // (baseIsSameAsCompBench=true).
+  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true, undefined, undefined, true);
   card.innerHTML = built.main;
   syncCardEl.innerHTML = built.syncCard;
   wireTwinToggle(card, target, r);
@@ -5320,7 +5387,10 @@ function renderSummaryCards(base){
       const baseOwnSync = computeSyncRate(getVirtualBenchmarkComplex('seoul'), base);
       const baseEstimate = (!baseSync && !baseOwnSync) ? findSyncRateEstimate(base) : null;
       const baseBenchStatusHtml = buildBenchStatusCard(baseBench, baseBenchGroup, base);
-      card.innerHTML = buildDiagCardBody('base', base, rBase, baseSync, false, baseEstimate, baseBenchStatusHtml, 'bc', false, '<span class="seed-badge">기준단지</span>');
+      // 기준단지 자신의 카드는 항상 base 자신의 진짜 선도단지(baseBench)
+      // 대비로만 계산되므로(사용자가 고를 다른 "기준단지" 개념 자체가
+      // 없음) 토글을 강제로 비활성화한다(baseIsSameAsCompBench=true).
+      card.innerHTML = buildDiagCardBody('base', base, rBase, baseSync, false, baseEstimate, baseBenchStatusHtml, 'bc', false, '<span class="seed-badge">기준단지</span>', undefined, true);
       grid.appendChild(card);
       wireTwinToggle(card, base, rBase);
       wireEstDetailToggle(card, base, baseEstimate);
@@ -5373,7 +5443,7 @@ function renderSummaryCards(base){
     const baseCompareHtml = (compOwnSync && syncVsBase && !baseIsSameAsCompBench)
       ? buildBaseCompareNote(base.name||'기준단지', syncVsBase)
       : '';
-    card.innerHTML = buildDiagCardBody(i, comp, r, sync, false, estimate, benchStatusHtml, undefined, undefined, undefined, baseCompareHtml);
+    card.innerHTML = buildDiagCardBody(i, comp, r, sync, false, estimate, benchStatusHtml, undefined, undefined, undefined, baseCompareHtml, baseIsSameAsCompBench);
     grid.appendChild(card);
     wireTwinToggle(card, comp, r);
     wireEstDetailToggle(card, comp, estimate);
@@ -5472,7 +5542,7 @@ function renderSummaryTable(base){
     const baseCompareHtml = (compOwnSync && syncVsBase && !baseIsSameAsCompBench)
       ? buildBaseCompareNote(base.name||'기준단지', syncVsBase)
       : '';
-    detailTr.innerHTML = '<td colspan="8"><div class="card diag-detail-card">'+buildDiagCardBody(i, comp, r, sync, true, estimate, benchStatusHtml, undefined, undefined, undefined, baseCompareHtml)+'</div></td>';
+    detailTr.innerHTML = '<td colspan="8"><div class="card diag-detail-card">'+buildDiagCardBody(i, comp, r, sync, true, estimate, benchStatusHtml, undefined, undefined, undefined, baseCompareHtml, baseIsSameAsCompBench)+'</div></td>';
     tbody.appendChild(detailTr);
     wireTwinToggle(detailTr, comp, r);
     wireEstDetailToggle(detailTr, comp, estimate);
@@ -5775,6 +5845,20 @@ document.addEventListener('click', (e)=>{
     // 부모가 display:none이라 크기가 0으로 잡혀있다 — 펼쳐질 때 강제 리사이즈.
     body.querySelectorAll('canvas').forEach(cv => { const ch = Chart.getChart(cv); if (ch) ch.resize(); });
   }
+});
+// 진단요약 카드 "선도단지 기준 / 기준단지 기준" 토글(2026-09 세션) — 이
+// 값 하나가 카드 안의 배지·헤드라인·배율·갭·상세문구를 전부 다시 계산해야
+// 해서(activeR 자체가 바뀜) DOM만 부분적으로 바꾸지 않고 render()로 그
+// 화면(다중비교 카드 그리드/시세표) 전체를 다시 그린다 — 체크박스 표시
+// 전환 등 기존의 다른 카드 옵션들도 같은 방식(saveState 없이 바로
+// render())을 쓴다.
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-frame]');
+  if (!btn) return;
+  const wrap = btn.closest('[data-frame-toggle]');
+  if (!wrap) return;
+  diagFrameMap.set(wrap.dataset.frameToggle, btn.dataset.frame);
+  render();
 });
 
 function renderChartTabs(){
