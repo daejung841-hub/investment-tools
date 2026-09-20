@@ -184,6 +184,20 @@ button{cursor:pointer;}
   .shell-body{flex-direction:column;}
   .sidebar{width:100%;flex:none;position:static;max-height:none;}
 }
+/* 좌측 단지 선택 패널 접기/펼치기(2026-09 세션) — 버튼은 .sidebar 밖(shell-body
+   직계 자식)에 둔다. .sidebar 안에 넣으면 접었을 때(.sidebar에 display:none)
+   버튼까지 같이 사라져 다시 펼 방법이 없어진다. */
+.sidebar-toggle-btn{
+  flex:none;width:20px;height:36px;align-self:flex-start;margin-top:2px;
+  border:1px solid var(--border-strong);background:var(--surface);border-radius:6px;
+  cursor:pointer;color:var(--ink-muted);font-size:13px;line-height:1;
+  position:sticky;top:16px;transition:border-color .15s,color .15s;
+}
+.sidebar-toggle-btn:hover{border-color:var(--accent);color:var(--accent);}
+.shell-body.sidebar-collapsed .sidebar{display:none;}
+@media (max-width:980px){
+  .sidebar-toggle-btn{display:none;} /* 모바일 레이아웃은 사이드바가 세로로 이미 접혀있어(top-mode 전환처럼) 별도 접기 UI가 불필요 */
+}
 
 .side-block{
   background:var(--surface);border:1px solid var(--border);border-radius:12px;
@@ -218,12 +232,6 @@ textarea{
   background:var(--surface-alt);color:var(--ink);border-radius:8px;padding:11px;
   font-family:var(--font-mono);font-size:12.5px;line-height:1.5;
 }
-.sidebar textarea{min-height:90px;font-size:10.5px;padding:8px;}
-.raw-toggle{margin-top:8px;}
-.raw-toggle > summary{cursor:pointer;font-size:11.5px;color:var(--accent);list-style:none;font-weight:600;}
-.raw-toggle > summary::-webkit-details-marker{display:none;}
-.raw-toggle[open] > summary{margin-bottom:6px;}
-
 .status-line{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:11.5px;color:var(--ink-muted);flex-wrap:wrap;}
 .status-line .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-faint);flex:none;}
 .status-line.ok .dot{background:var(--good);}
@@ -234,6 +242,12 @@ textarea{
 .seed-badge{
   display:inline-flex;align-items:center;gap:6px;background:var(--info-bg);color:var(--info);
   border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;
+}
+/* 상단 데이터 기준월 표시(2026-09 세션) — 알림이 아니라 단순 사실 표기라
+   .seed-badge(강조색)보다 톤을 낮춘다. */
+.data-asof-badge{
+  display:inline-flex;align-items:center;background:var(--neutral-bg);color:var(--ink-faint);
+  border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;margin-left:2px;
 }
 
 .tabs{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px;}
@@ -799,7 +813,7 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
   <div class="topbar">
     <div>
       <h1>저평가 단지 계산기</h1>
-      <div class="sub">대장 단지 대비 매매·전세 배율로 이론적 적정가를 역산해 저평가·고평가를 진단합니다</div>
+      <div class="sub">대장 단지 대비 매매·전세 배율로 이론적 적정가를 역산해 저평가·고평가를 진단합니다 <span class="data-asof-badge" id="dataAsOfBadge" hidden></span></div>
     </div>
     <div class="topbar-actions">
       <button class="btn icon-btn" id="themeToggleBtn" type="button" title="다크 모드로 전환">🌙</button>
@@ -852,7 +866,8 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
   </section>
 
   <div class="shell-body" id="multiCompareShell">
-    <aside class="sidebar">
+    <button class="sidebar-toggle-btn" id="sidebarToggleBtn" type="button" title="단지 선택 패널 접기">‹</button>
+    <aside class="sidebar" id="sidebarPanel">
       <details class="side-block" open>
         <summary>기준 단지 (대장 단지)<span class="chevron">▸</span></summary>
         <div class="side-block-body">
@@ -877,11 +892,6 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
           </div>
           <div class="status-line" id="baseStatus"><span class="dot"></span><span>데이터를 붙여넣어주세요</span></div>
           <div id="baseFairSummary"></div>
-          <details class="raw-toggle">
-            <summary>직접 붙여넣기 (고급)</summary>
-            <textarea id="baseText" placeholder="KB부동산 '시세 변동' 표를 그대로 복사해 붙여넣으세요"></textarea>
-            <div class="lib-row"><button class="btn small" id="baseLibSave">라이브러리에 저장</button></div>
-          </details>
         </div>
       </details>
 
@@ -917,18 +927,6 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
               </div>
             </div>
           </div>
-        </div>
-      </details>
-
-      <details class="side-block">
-        <summary>준거 단지 (고급, 선택)<span class="chevron">▸</span></summary>
-        <div class="side-block-body">
-          <div class="status-line" style="margin-top:10px;"><span class="dot"></span><span>신축·준신축처럼 자체 역사상 데이터가 짧은 단지를 위한 수동 참고 비교입니다</span></div>
-          <div class="lib-search-wrap" style="margin-top:8px;">
-            <input class="textish lib-search" id="refComplexSearch" placeholder="🔍 단지명 검색..." autocomplete="off">
-            <div class="lib-autocomplete" id="refComplexAutocomplete" hidden></div>
-          </div>
-          <select id="refComplexSelect" style="margin-top:8px;"><option value="">선택 안 함</option></select>
         </div>
       </details>
 
@@ -1002,10 +1000,6 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
         <div class="cards-grid" id="summaryCards"></div>
       </section>
 
-      <section id="refCompareSection" style="display:none;">
-        <div class="section-title"><h2>준거 단지 비교</h2><span class="hint">사이드바에서 고른 준거 단지와 기준단지를 나란히 비교합니다 (수동 참고용)</span></div>
-        <div class="card" id="refCompareCard"></div>
-      </section>
     </main>
   </div>
 
@@ -1254,6 +1248,42 @@ function buildComplex(text, nameOverride, fallbackName){
 }
 function ymIndex(ym){ return Math.floor(ym/100)*12 + (ym%100-1); }
 function fmtYm(ym){ return Math.floor(ym/100)+'.'+String(ym%100).padStart(2,'0'); }
+// 상단 데이터 기준월 배지(2026-09 세션) — KB 크롤링이 단지별로 배치 처리돼
+// 최신월이 완전히 균일하지 않다(실측 확인: 1,198개 중 833개가 202609,
+// 364개가 202608). entry.text는 항상 최신월이 첫 데이터줄에 온다(원자료가
+// 내림차순으로 저장됨, 실측 확인) — 전체를 파싱할 필요 없이 첫 6자리
+// 숫자만 정규식으로 뽑아서 가볍게 계산한다(1,200여개 단지 전체 파싱 대신
+// 문자열 앞부분만 훑음).
+// 단순 min/max는 위험하다 — 실측 확인: 딱 1개 단지("느티마을공무원(4단지)")가
+// 202512(9개월 전)에 멈춰있어(거래 중단 등으로 KB가 갱신을 안 한 것으로
+// 추정) min/max를 그대로 쓰면 "2025.12~2026.09"처럼 사실을 왜곡하는 범위가
+// 나온다. 단지 수 기준 1% 미만인 월(이런 소수 정체 사례)은 "이번 크롤링
+// 배치"가 아니라고 보고 범위 계산에서 제외한다.
+function computeDataAsOfRange(){
+  const counts = new Map();
+  (window.SEED_COMPLEXES||[]).forEach(e=>{
+    if (!e.text) return;
+    const m = e.text.match(/(\d{6}),/);
+    if (!m) return;
+    const ym = parseInt(m[1],10);
+    counts.set(ym, (counts.get(ym)||0)+1);
+  });
+  const total = [...counts.values()].reduce((s,v)=>s+v,0);
+  if (!total) return { min:null, max:null };
+  const minCount = Math.max(1, Math.ceil(total*0.01));
+  const mainYms = [...counts.entries()].filter(([,c]) => c>=minCount).map(([ym]) => ym);
+  if (!mainYms.length) return { min:null, max:null };
+  return { min: Math.min(...mainYms), max: Math.max(...mainYms) };
+}
+function dataAsOfLabel(){
+  const { min, max } = computeDataAsOfRange();
+  if (min==null) return null;
+  const minYear = Math.floor(min/100), minMonth = min%100;
+  const maxYear = Math.floor(max/100), maxMonth = max%100;
+  if (min === max) return minYear+'년 '+minMonth+'월 KB시세 자료 기준';
+  if (minYear === maxYear) return minYear+'년 '+minMonth+'~'+maxMonth+'월 KB시세 자료 기준';
+  return minYear+'.'+String(minMonth).padStart(2,'0')+'~'+maxYear+'.'+String(maxMonth).padStart(2,'0')+' KB시세 자료 기준';
+}
 function fmtEok(v){ if (v==null) return '—'; return (v/10000).toFixed(1)+'억'; }
 function fmtPct(v, digits){ if (v==null) return '—'; digits = digits==null?1:digits; return v.toFixed(digits)+'%'; }
 function fmtPP(v){ if (v==null) return '—'; const s = v>0?'+':''; return s+v.toFixed(1)+'%p'; }
@@ -1435,7 +1465,7 @@ const BENCHMARK_GROUPS = {
   },
   rebuild: {
     label: '서울 선도단지(재건축)',
-    members: ['현대(1,2차)','은마','잠실주공(5단지)','장미(1차)','장미(2차)','시범','한강맨션.','신반포(한신2차)','아시아선수촌','개포주공6단지','목동신시가지(7단지)','목동신시가지(9단지)','목동신시가지(10단지)','목동신시가지(13단지)','목동신시가지(14단지)','삼풍','올림픽선수기자촌','성산시영','한보미도맨션','삼익그린맨션(2차)']
+    members: ['현대(1,2차)','은마','잠실주공(5단지)','장미(1차)','장미(2차)','시범','한강맨션.','신반포(한신2차)','아시아선수촌','개포주공6단지.','목동신시가지(7단지)','목동신시가지(9단지)','목동신시가지(10단지)','목동신시가지(13단지)','목동신시가지(14단지)','삼풍','올림픽선수기자촌','성산시영','한보미도맨션','삼익그린맨션(2차)']
   }
 };
 
@@ -1717,7 +1747,6 @@ const state = {
   ratioPeakOn: false,
   ratioTroughOn: false,
   ratioAvgOn: false,
-  refComplexName: '',
   benchmarkChoice: {},
   benchmarkOverlayOn: false,
   benchmarkOverlayGroup: 'seoul',
@@ -2804,7 +2833,16 @@ function findTwinCandidates(comp){
       // 완료) 중 겹치는 구간 전체 경로가 가장 비슷한(ampRms 최소) 후보로
       // 채운다. 두 슬롯이 서로 다른 기준으로 뽑혔다는 걸 알 수 있도록
       // matchTypeTag가 similarReason으로 배지 문구를 구분한다.
-      const similarCorr = notClosed.slice(0, 1).map(t => ({ ...t, matchType: 'similar', similarReason: 'corr' }));
+      // 항목(2026-09-21 세션, "동조 1위" 오매칭 재조사) — "상승폭 유사"만
+      // decoupling.deviated 배제 필터가 있고 "동조 1위"는 없어서, 표본
+      // 191개 실측 결과 "동조 1위"의 49.2%(94개)가 현재 이탈 중인
+      // 후보였다(더샵부평센트럴시티-개포주공6단지 사례가 대표적). corr
+      // 자체는 여전히 최우선 기준이되, "지금 갈라져 있는" 후보는 애초에
+      // 순위에서 제외한다 — 아래 ampPool과 동일한 이유(방향성 동조는
+      // 있어도 "지금" 닮았다고 볼 수 없음)로 후보가 하나도 안 남으면
+      // corr 2위로 폴백하지 않고 슬롯을 그대로 비운다.
+      const corrPool = notClosed.filter(t => !(t.decoupling && t.decoupling.deviated));
+      const similarCorr = corrPool.slice(0, 1).map(t => ({ ...t, matchType: 'similar', similarReason: 'corr' }));
       const similarCorrNames = new Set(similarCorr.map(t=>t.name));
       // 항목(2026-09-20 세션, "상승폭 유사" 오매칭 재조사) — ampRms는 겹치는
       // 구간 "전체" 평균이라, 과거엔 평평하게 비슷했다가 최근 들어 완전히
@@ -4149,7 +4187,6 @@ function render(){
   const base = getBaseComplex();
   document.getElementById('baseName').value = state.baseName;
   document.getElementById('basePreset').value = state.basePreset;
-  document.getElementById('baseText').value = state.baseText;
   document.getElementById('thresholdInput').value = state.threshold;
   document.getElementById('gasUrlInput').value = state.gasUrl || '';
   document.querySelectorAll('#periodSeg button').forEach(b=>b.classList.toggle('active', b.dataset.period===state.period));
@@ -4159,7 +4196,6 @@ function render(){
   renderBaseStatus(base);
   renderCompareTabs(base);
   renderSummaryCards(base);
-  renderRefCompareSection(base);
   renderSummaryTable(base);
   renderChartTabs();
   renderActiveChart(base);
@@ -4256,14 +4292,7 @@ function renderCompareTabs(base){
       '<div class="status-line'+(comp.rows.length?' ok':'')+'">'+
         '<span class="dot"></span><span>'+(comp.rows.length ? comp.rows.length+'개월 · '+fmtYm(comp.rows[0].ym)+'~'+fmtYm(comp.rows[comp.rows.length-1].ym) : '데이터 없음')+'</span>'+seedTag+
       '</div>'+
-      '<div class="common-range" data-role="common"></div>'+
-      '<details class="raw-toggle">'+
-        '<summary>직접 붙여넣기 (고급)</summary>'+
-        '<textarea data-role="text" placeholder="비교단지 원자료를 붙여넣으세요">'+ (state.compares[i].text||'') +'</textarea>'+
-        '<div class="lib-row">'+
-          '<button class="btn small" data-role="libsave">라이브러리에 저장</button>'+
-        '</div>'+
-      '</details>';
+      '<div class="common-range" data-role="common"></div>';
     slotsEl.appendChild(panel);
     renderLibraryOptions(panel.querySelector('[data-role=lib]'));
     wireLibrarySearch(panel.querySelector('[data-role=libSearch]'), panel.querySelector('[data-role=lib]'), null, panel.querySelector('[data-role=libAutocomplete]'));
@@ -4276,12 +4305,6 @@ function renderCompareTabs(base){
         : '기준단지와 겹치는 구간이 없습니다.';
     }
 
-    panel.querySelector('[data-role=text]').addEventListener('input', (e)=>{
-      state.compares[i].text = e.target.value;
-      state.compares[i].visible = true;
-      if (i===0) usingSeed = false;
-      saveState(); debounceRender();
-    });
     panel.querySelector('[data-role=name]').addEventListener('input', (e)=>{
       state.compares[i].name = e.target.value; saveState(); debounceRender();
     });
@@ -4320,9 +4343,6 @@ function renderCompareTabs(base){
       if (nextEmpty !== -1) state.activeSlot = nextEmpty;
       saveState(); render();
       if (nextEmpty !== -1) focusSlotSearch(nextEmpty);
-    });
-    panel.querySelector('[data-role=libsave]').addEventListener('click', ()=>{
-      saveToLibrary(state.compares[i].name || comp.parsedName, state.compares[i].text);
     });
     wireUploadButton(panel.querySelector('[data-role=upload]'), panel.querySelector('[data-role=uploadInput]'), (results)=>{
       const targets = [i];
@@ -4429,17 +4449,6 @@ function wireLibrarySearch(inputEl, selectEl, renderFn, autocompleteEl){
 function refreshLibraryUI(){
   document.getElementById('libCount').textContent = state.library.length;
   renderLibraryOptions(document.getElementById('baseLibSelect'));
-  renderRefComplexOptions();
-}
-
-function renderRefComplexOptions(){
-  const selectEl = document.getElementById('refComplexSelect');
-  if (!selectEl) return;
-  const filter = (selectEl.dataset.filter||'').trim();
-  const entries = filter ? state.library.filter(e => e.name.includes(filter)) : state.library;
-  selectEl.innerHTML = '<option value="">선택 안 함</option>'+
-    entries.map(e=>'<option value="'+esc(e.name)+'">'+esc(e.name)+' ('+libraryEntryMonthCount(e)+'개월)'+'</option>').join('');
-  selectEl.value = state.refComplexName && entries.some(e=>e.name===state.refComplexName) ? state.refComplexName : '';
 }
 
 function refreshGasStatus(){
@@ -5454,31 +5463,6 @@ function renderSummaryCards(base){
   }
 }
 
-function renderRefCompareSection(base){
-  const section = document.getElementById('refCompareSection');
-  const card = document.getElementById('refCompareCard');
-  const entry = state.library.find(x=>x.name===state.refComplexName);
-  if (!entry || !base.rows.length){ section.style.display = 'none'; return; }
-  const ref = buildComplex(entry.text, entry.name, entry.name);
-  if (!ref.rows.length){ section.style.display = 'none'; return; }
-  section.style.display = '';
-
-  const slot = computeSlot(base, ref);
-  const multHtml = slot.error
-    ? '<div class="card-msg">'+slot.error+' — 배율을 계산할 공통 구간이 없습니다.</div>'
-    : '<div class="stat-row"><span class="k">매매 배율 (현재 / 평균)</span><span class="v">'+fmtPct(slot.currentSaleRatio)+' / '+fmtPct(slot.avgSaleRatio)+'</span></div>'+
-      '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균)</span><span class="v">'+fmtPct(slot.currentJeonseRatio)+' / '+fmtPct(slot.avgJeonseRatio)+'</span></div>';
-
-  const baseStats = computeSelfRatioStats(base);
-  const refStats = computeSelfRatioStats(ref);
-  card.innerHTML =
-    '<div class="card-msg">기준단지 대비 준거단지("'+esc(ref.name)+'") 가격배율 (준거단지 시세 ÷ 기준단지 시세)</div>'+
-    multHtml+
-    '<div class="diag-wide" style="margin-top:8px;">'+
-      '<div class="diag-wide-col">'+ratioStatCardInner(base.name||'기준단지', '--series-base', baseStats, state.threshold)+'</div>'+
-      '<div class="diag-wide-col">'+ratioStatCardInner(ref.name, '--ink-faint', refStats, state.threshold)+'</div>'+
-    '</div>';
-}
 
 const openDiagRows = new Set();
 
@@ -6811,7 +6795,6 @@ function wireStaticEvents(){
     saveState(); render();
   });
   document.getElementById('baseName').addEventListener('input', (e)=>{ state.baseName = e.target.value; saveState(); debounceRender(); });
-  document.getElementById('baseText').addEventListener('input', (e)=>{ state.baseText = e.target.value; usingSeed=false; saveState(); debounceRender(); });
   document.getElementById('thresholdInput').addEventListener('input', (e)=>{
     const v = parseFloat(e.target.value); state.threshold = Number.isFinite(v) && v>0 ? v : 3; saveState(); render();
   });
@@ -6897,7 +6880,6 @@ function wireStaticEvents(){
     saveState(); render();
   });
   wireLibrarySearch(document.getElementById('baseLibSearch'), document.getElementById('baseLibSelect'), null, document.getElementById('baseLibAutocomplete'));
-  wireLibrarySearch(document.getElementById('refComplexSearch'), document.getElementById('refComplexSelect'), renderRefComplexOptions, document.getElementById('refComplexAutocomplete'));
   document.querySelectorAll('#topModeTabs .top-mode-btn').forEach(b=>{
     b.addEventListener('click', ()=>{ saveState(); setTopMode(b.dataset.topMode); });
   });
@@ -6933,13 +6915,6 @@ function wireStaticEvents(){
     renderSingleDiag(state.singleTargetName);
   });
   wireLibrarySearch(document.getElementById('singleLibSearch'), document.getElementById('singleLibSelect'), null, document.getElementById('singleLibAutocomplete'));
-  document.getElementById('baseLibSave').addEventListener('click', ()=>{
-    saveToLibrary(getBaseComplex().name, state.baseText);
-  });
-  document.getElementById('refComplexSelect').addEventListener('change', (e)=>{
-    state.refComplexName = e.target.value;
-    saveState(); render();
-  });
   wireUploadButton(document.getElementById('baseUploadBtn'), document.getElementById('baseUploadInput'), (results)=>{
     const first = results[0];
     state.baseText = first.text; state.baseName = first.name; state.basePreset = 'custom'; usingSeed = false;
@@ -6966,6 +6941,7 @@ function wireStaticEvents(){
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ()=> { updateThemeToggleBtn(); rerenderCurrentScreen(); });
   }
   initTheme();
+  initSidebarToggle();
 }
 // 항목 1(2026-09-21 세션) — 다크모드 토글을 만들면서 실제로 눌러보고서야
 // 발견한 버그: render()는 다중비교 화면 전용이라 renderActiveChart 안에
@@ -7016,6 +6992,35 @@ function initTheme(){
     try { localStorage.setItem(THEME_STORE_KEY, next); } catch(e){}
     updateThemeToggleBtn();
     rerenderCurrentScreen();
+  });
+}
+// 좌측 단지 선택 패널 접기/펼치기(2026-09 세션) — 다크모드 토글과 같은
+// 패턴(별도 localStorage 키, 앱 데이터(state)와는 분리)을 그대로 따른다 —
+// "초기화" 버튼이 기준·비교단지 데이터만 지우고 레이아웃 취향(다크모드,
+// 이 패널 상태)은 건드리면 안 되기 때문이다. 접힌 채로 차트가 만들어지는
+// 경우는 없으므로(부트스트랩 시점에 이미 접힌 상태로 렌더되면 Chart.js가
+// 잘못된 크기로 굳는 문제도 원천적으로 없다 — main-col은 처음부터 넓게
+// 잡혀 렌더된다) 별도 resize 처리는 필요 없다.
+const SIDEBAR_COLLAPSE_STORE_KEY = 'benchmarkCalcSidebarCollapsed';
+function updateSidebarToggleBtn(collapsed){
+  const btn = document.getElementById('sidebarToggleBtn');
+  if (!btn) return;
+  btn.textContent = collapsed ? '›' : '‹';
+  btn.title = collapsed ? '단지 선택 패널 펼치기' : '단지 선택 패널 접기';
+}
+function initSidebarToggle(){
+  const shell = document.getElementById('multiCompareShell');
+  const btn = document.getElementById('sidebarToggleBtn');
+  if (!shell || !btn) return;
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(SIDEBAR_COLLAPSE_STORE_KEY) === '1'; } catch(e){}
+  shell.classList.toggle('sidebar-collapsed', collapsed);
+  updateSidebarToggleBtn(collapsed);
+  btn.addEventListener('click', () => {
+    collapsed = !shell.classList.contains('sidebar-collapsed');
+    shell.classList.toggle('sidebar-collapsed', collapsed);
+    updateSidebarToggleBtn(collapsed);
+    try { localStorage.setItem(SIDEBAR_COLLAPSE_STORE_KEY, collapsed ? '1' : '0'); } catch(e){}
   });
 }
 
@@ -7069,4 +7074,12 @@ setTopMode(state.topMode || 'multi');
 // topMode에 맞는 렌더 함수로 분기한다.
 rerenderCurrentScreen();
 if (state.gasUrl) gasFetchList();
+(function(){
+  const badge = document.getElementById('dataAsOfBadge');
+  if (!badge) return;
+  const label = dataAsOfLabel();
+  if (!label) return;
+  badge.textContent = label;
+  badge.hidden = false;
+})();
 </script>
