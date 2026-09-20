@@ -875,7 +875,6 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
             <option value="els">잠실엘스 (재개발 비교용)</option>
             <option value="eunma">은마아파트 (재건축 비교용)</option>
             <option value="benchmark-seoul">서울 선도단지(일반) (가상 단지)</option>
-            <option value="benchmark-rebuild">서울 선도단지(재건축) (가상 단지)</option>
             <option value="custom">직접입력</option>
           </select>
           <input class="textish name-input" id="baseName" placeholder="기준 단지명" style="margin-top:8px;">
@@ -6692,11 +6691,16 @@ function renderActiveChart(base){
     return;
   }
   if (state.activeChart==='multi'){
+    // 항목(2026-09 세션, "재건축 선도단지 UI 노출 축소") — 이 목록은 사용자가
+    // "단지 선택" 드롭다운에서 직접 골라 그 자체를 진단 주체로 보는 용도라
+    // #basePreset의 "재건축 (가상 단지)" 옵션과 같은 종류다. 배경 로직
+    // (BENCHMARK_GROUPS.rebuild, pickBenchGroupForTarget, 재건축 배제
+    // 필터 등 152개 노후단지 자동분류에 쓰이는 부분)은 전혀 건드리지
+    // 않고, 이 "직접 선택" 항목만 뺀다.
     const entries = [{ key:'base', name: base.name||'기준단지', complex: base, varName:'--series-base' }]
       .concat(comps.map(({i,c})=>({ key:String(i), name:c.name, complex:c, varName:SLOT_COLORS[i] })))
       .concat([
-        { key:'bench-seoul', name: BENCHMARK_GROUPS.seoul.label, complex: getVirtualBenchmarkComplex('seoul'), varName:null },
-        { key:'bench-rebuild', name: BENCHMARK_GROUPS.rebuild.label, complex: getVirtualBenchmarkComplex('rebuild'), varName:null }
+        { key:'bench-seoul', name: BENCHMARK_GROUPS.seoul.label, complex: getVirtualBenchmarkComplex('seoul'), varName:null }
       ]);
     if (state.multiSlot==null || !entries.find(x=>x.key===state.multiSlot)) state.multiSlot = 'base';
     const controls = '<div class="overlay-controls"><span class="grp-label">단지 선택</span><select id="multiSelect">'+
