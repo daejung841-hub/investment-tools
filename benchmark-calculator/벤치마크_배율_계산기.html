@@ -668,6 +668,21 @@ textarea{
 .chart-ext-tooltip-tiny .chart-ext-values{gap:2px 7px;}
 .chart-ext-tooltip-tiny .chart-ext-line{font-size:9.5px;line-height:1.35;gap:3px;}
 .chart-ext-tooltip-tiny .chart-ext-dot{width:7px;height:7px;}
+/* 항목(2026-09-21 세션) — 메인 시세추이 차트(.chart-box)는 위 두 modifier와
+   달리 큰 폰트를 유지해왔는데, 비교단지를 5~10개 선택하면 값 목록이 여러
+   줄로 줄바꿈되면서 고정 max-height(84px)/예약 상단여백(88px, 전역
+   CHART_EXT_TOOLTIP_RESERVED_TOP)을 넘어 뒷부분이 overflow:hidden에
+   잘렸다. base 폰트(14/15px)보다는 줄이되 twin/bench의 compact/tiny만큼
+   작게 하진 않고(메인 차트는 여전히 상대적으로 커야 한다는 기존 방침
+   유지), max-height/예약 상단여백을 이 유형에서만 넉넉히 늘려 여러 줄이
+   와도 잘리지 않게 한다(예약 여백은 chartExternalTooltipHandler 쪽에서
+   개별 차트 인스턴스에 layout.padding.top으로 오버라이드한다 — 전역
+   기본값을 그대로 키우면 twin/bench 카드에도 불필요한 여백이 생긴다). */
+.chart-ext-tooltip-main{max-height:168px;}
+.chart-ext-tooltip-main .chart-ext-title{font-size:12.5px;line-height:1.3;}
+.chart-ext-tooltip-main .chart-ext-values{gap:3px 10px;}
+.chart-ext-tooltip-main .chart-ext-line{font-size:13px;line-height:1.35;gap:4px;}
+.chart-ext-tooltip-main .chart-ext-dot{width:8px;height:8px;}
 .twin-msg{font-size:12px;color:var(--ink-muted);margin-top:6px;line-height:1.5;}
 .card.empty{align-items:center;justify-content:center;color:var(--ink-faint);font-size:13px;min-height:150px;text-align:center;}
 
@@ -1059,6 +1074,13 @@ const CHART_EXT_TOOLTIP_PLACEHOLDER = '그래프에 마우스를 올리면 값�
 // 한다. 76 -> 88로 올렸다(2026-09-19 세션, 폰트 확대에 맞춰 재조정) —
 // 제목 1줄(14px) + 값 목록 최대 2줄(15px)까지 안전하게 담기 위해서다.
 const CHART_EXT_TOOLTIP_RESERVED_TOP = 88;
+// 메인 시세추이 차트(.chart-ext-tooltip-main, 아래 참조) 전용 예약 여백 —
+// .chart-ext-tooltip-main의 max-height(168px)와 짝을 맞춘다(기존 88px도
+// max-height 84px과 4px 여유를 두는 것과 같은 비율). 이 값은 Chart.defaults
+// 전역이 아니라 ensureChartExtTooltipBox에서 해당 차트 인스턴스의
+// options.layout.padding.top에만 개별 적용한다 — 전역을 키우면 twin/bench
+// 카드에도 불필요한 여백이 생기기 때문이다.
+const CHART_EXT_TOOLTIP_RESERVED_TOP_MAIN = 172;
 // 캔버스의 "바로 그" 부모를 기준(anchor)으로 삼는다 — 항목(2026-09-19
 // 세션, 재조사) 전에는 특정 클래스 목록(.chart-box/.chart-canvas-wrap/
 // .twin-chart-wrap)에만 매칭시켰는데, "선도단지 현재 위치" 카드가 쓰는
@@ -1096,8 +1118,19 @@ function ensureChartExtTooltipBox(chart){
     // 카드 유형별로 별도 modifier 클래스를 붙여 서로 다른 크기를 쓴다 —
     // 항목 1(2026-09-20 세션)에서 쌍둥이/준거단지 미니차트(.twin-chart-wrap)도
     // 여전히 크다는 재확인을 받아 별도로 더 작은 modifier를 추가했다.
+    // 그 외(=메인 시세추이 차트, .chart-canvas-wrap 또는 solo 모드의
+    // .chart-box 자체)는 전부 -main modifier를 쓴다 — 새 차트 래퍼가
+    // 추가돼도 명시적으로 compact/tiny로 분류되지 않는 한 이쪽으로
+    // 자연스럽게 떨어진다.
+    // 예약 상단여백(reservedTop)은 여기서 살아있는 chart.options를 직접
+    // 건드리는 대신(그러면 Chart.js 4의 옵션 프록시가 재귀호출에 빠져
+    // "Maximum call stack size exceeded"로 죽는다 — 실측으로 확인됨),
+    // 각 차트 config를 만드는 chartOptions()/multiChartConfig() 쪽에서
+    // 생성 시점에 이미 CHART_EXT_TOOLTIP_RESERVED_TOP_MAIN을 심어 넣었다.
+    // 여기서는 CSS modifier 클래스만 붙인다.
     if (anchor.classList.contains('bench-chart-wrap')) box.classList.add('chart-ext-tooltip-compact');
     else if (anchor.classList.contains('twin-chart-wrap')) box.classList.add('chart-ext-tooltip-tiny');
+    else box.classList.add('chart-ext-tooltip-main');
     box.innerHTML = '<span class="chart-ext-placeholder">'+CHART_EXT_TOOLTIP_PLACEHOLDER+'</span>';
     anchor.insertBefore(box, anchor.firstChild);
   }
@@ -5892,7 +5925,7 @@ function priceChartConfig(base, comps, field, ratioField, showFair, benchmarkOve
   return {
     type:'line',
     data:{ labels: labelStrs, datasets },
-    options: chartOptions((v)=> fmtEok(v))
+    options: chartOptions((v)=> fmtEok(v), CHART_EXT_TOOLTIP_RESERVED_TOP_MAIN)
   };
 }
 
@@ -5978,7 +6011,7 @@ function ratioChartConfig(base, comps, field){
   });
   return {
     type:'line', data:{ labels: labelStrs, datasets },
-    options: chartOptions((v)=> v==null?'—':v.toFixed(1)+'%')
+    options: chartOptions((v)=> v==null?'—':v.toFixed(1)+'%', CHART_EXT_TOOLTIP_RESERVED_TOP_MAIN)
   };
 }
 
@@ -6002,7 +6035,7 @@ function overlayChartConfig(base, comp){
   return {
     type:'line',
     data:{ labels: labelStrs, datasets },
-    options: chartOptions((v)=> v==null?'—':v.toFixed(1)+'%')
+    options: chartOptions((v)=> v==null?'—':v.toFixed(1)+'%', CHART_EXT_TOOLTIP_RESERVED_TOP_MAIN)
   };
 }
 
@@ -6215,6 +6248,7 @@ function multiChartConfig(entry, flags){
     options:{
       responsive:true, maintainAspectRatio:false,
       interaction:{ mode:'index', intersect:false },
+      layout:{ padding:{ top: CHART_EXT_TOOLTIP_RESERVED_TOP_MAIN } },
       plugins:{
         legend:{ position:'bottom', labels:{ color:fontColor, boxWidth:10, boxHeight:10, usePointStyle:true, font:{ family:"'Noto Sans KR'", size:11.5 } } },
         tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': '+(ctx.dataset.yAxisID==='y1' ? (ctx.parsed.y==null?'—':ctx.parsed.y.toFixed(1)+'%') : fmtEok(ctx.parsed.y)) } }
@@ -6244,9 +6278,17 @@ function decoupleInterpretation(d){
   return { tone, text: parts.join(' ') };
 }
 
-function chartOptions(tooltipFmt){
+// reservedTop: 메인 시세추이 차트(.chart-ext-tooltip-main, 위 CSS 참조)
+// 전용 예약 상단여백. Chart.js 라이브 인스턴스의 options를 생성 후에
+// 건드리면(chart.options.layout.padding = ... 식) 내부 옵션 프록시가
+// 재귀호출에 빠져 "Maximum call stack size exceeded"로 죽는다(실측으로
+// 확인됨) — 반드시 이렇게 생성 시점의 일반 객체에 넣어서 Chart.js
+// 자신의 병합 로직에 맡겨야 안전하다. bench/twin 차트를 만드는
+// jeonseRatioChartConfig 등은 이 인자를 넘기지 않아 전역 기본값
+// (CHART_EXT_TOOLTIP_RESERVED_TOP)을 그대로 물려받는다.
+function chartOptions(tooltipFmt, reservedTop){
   const fontColor = chartFontColor(), gridColor = chartGridColor();
-  return {
+  const options = {
     responsive:true, maintainAspectRatio:false,
     interaction:{ mode:'index', intersect:false },
     plugins:{
@@ -6262,6 +6304,8 @@ function chartOptions(tooltipFmt){
       y:{ ticks:{ color:fontColor, font:{ size:11 }, callback:(v)=>tooltipFmt(v) }, grid:{ color:gridColor } }
     }
   };
+  if (reservedTop != null) options.layout = { padding: { top: reservedTop } };
+  return options;
 }
 
 function allTimeHigh(map, field){
