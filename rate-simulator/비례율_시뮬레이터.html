@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>비례율 시뮬레이터</title>
+<title>추가분담금 / 비례율 계산기</title>
 <script src="../config.js"></script>
 <script src="../gate.js"></script>
 <script>requireSiteAuth('../index.html');</script>
@@ -200,7 +200,7 @@ button{cursor:pointer;}
 <div class="wrap">
   <div class="topbar">
     <div>
-      <h1>비례율 시뮬레이터</h1>
+      <h1>추가분담금 / 비례율 계산기</h1>
       <div class="sub">공사비·분양가가 바뀌면 비례율과 추가분담금이 어떻게 달라지는지 계산합니다 · 모든 금액은 만원 단위로 입력합니다</div>
     </div>
     <div class="project-io-row">
@@ -1690,7 +1690,7 @@ button{cursor:pointer;}
 
   document.getElementById('btnExportBackup').addEventListener('click', () => {
     const state = collectFullState();
-    const name = (state.projectName || '비례율시뮬레이터').trim();
+    const name = (state.projectName || '추가분담금_비례율계산기').trim();
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1833,7 +1833,7 @@ button{cursor:pointer;}
     const wb = new ExcelJS.Workbook();
     // 85% 축소 보기로 열었을 때 스크롤 없이 한 화면에 들어오도록 zoomScale을 지정하고
     // 열 너비를 그 기준으로 다시 잡는다(Task 52의 폭은 100% 기준이라 85%에서도 과했다).
-    ws = wb.addWorksheet('비례율 시뮬레이터', { views: [{ showGridLines: false, zoomScale: 85 }] });
+    ws = wb.addWorksheet('추가분담금 비례율 계산기', { views: [{ showGridLines: false, zoomScale: 85 }] });
     // 좌/중/우 3단 구조(A-D, F-I, K-N)로 옆으로 넓혀서 세로 스크롤을 줄인다.
     // 억단위 보조 표시는 이제 숫자 바로 옆(각 단의 넷째 열)에 좁게 붙는 칸이라 폭이 작다.
     ws.columns = [
@@ -1942,7 +1942,7 @@ button{cursor:pointer;}
     }
 
     // ── 제목 + 사용법 안내 (전체 폭) ─────────────────────────────
-    writeFullBanner('🏢 비례율 시뮬레이터' + (projectName ? ' — ' + projectName : ''), { bg: XL_COLOR.navy, color: XL_COLOR.navyText, bold: true, size: 18, height: 32, center: true });
+    writeFullBanner('🏢 추가분담금 / 비례율 계산기' + (projectName ? ' — ' + projectName : ''), { bg: XL_COLOR.navy, color: XL_COLOR.navyText, bold: true, size: 18, height: 32, center: true });
     // 핵심 메시지를 굵게 앞세우고, 색상 설명은 참고용으로 뒤에 이어붙인다(리치 텍스트로 한 셀에 표시 — 행이 늘지 않는다).
     const guideRow = nextTopRow();
     ws.mergeCells('A' + guideRow + ':N' + guideRow);
@@ -2306,7 +2306,7 @@ button{cursor:pointer;}
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = (projectName || '비례율시뮬레이터') + '_결과.xlsx';
+    a.download = (projectName || '추가분담금_비례율계산기') + '_결과.xlsx';
     document.body.appendChild(a);
     a.click();
     a.remove();
