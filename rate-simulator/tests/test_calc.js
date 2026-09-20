@@ -468,3 +468,89 @@ run('calcSimplifiedDelta: 십정4 실측값 기준으로는 고급모드 Z와 �
   assert.ok(perMember > 0, `공사비 증가가 더 크므로 양수(추가분담금)여야 함: perMember=${perMember}`);
   assert.strictEqual(Math.round(perMember / 10000), 3510);
 });
+
+// --- Task 56: 목표값찾기 B안 확장 — 직접 인상률(%) 시뮬레이션 + 대표/평균 평당가 ---
+run('calcCustomRateIncreaseTable: 인상률(%)을 모든 평형에 동일 적용해 변경 후 분양가를 계산한다', () => {
+  const rows = [{ label: '59', unitPrice: 400 }, { label: '84', unitPrice: 500 }];
+  const table = window.RateCalc.calcCustomRateIncreaseTable(rows, 1000, 0.9, 1.0, 10);
+  assert.ok(Math.abs(table[0].newPrice - 440) < 1e-6, `newPrice=${table[0].newPrice}`);
+  assert.ok(Math.abs(table[1].newPrice - 550) < 1e-6, `newPrice=${table[1].newPrice}`);
+});
+
+run('calcCustomRateIncreaseTable: 기존 분담금은 현재 비례율, 변경 분담금은 새 비례율(newRate) 기준 권리가액을 쓴다', () => {
+  const rows = [{ label: '59', unitPrice: 400 }];
+  const table = window.RateCalc.calcCustomRateIncreaseTable(rows, 1000, 0.9, 0.95, 10);
+  assert.strictEqual(table[0].oldDues, 400 - 1000 * 0.9); // -500
+  assert.ok(Math.abs(table[0].newDues - (440 - 1000 * 0.95)) < 1e-6, `newDues=${table[0].newDues}`); // -510
+});
+
+run('calcCustomRateIncreaseTable: 인상률 0%면 변경 후 분양가가 기존과 같다', () => {
+  const table = window.RateCalc.calcCustomRateIncreaseTable([{ label: '59', unitPrice: 400 }], 1000, 0.9, 0.9, 0);
+  assert.strictEqual(table[0].newPrice, 400);
+});
+
+run('calcCustomRateIncreaseTable: 인상률이 음수면 분양가가 내려간다', () => {
+  const table = window.RateCalc.calcCustomRateIncreaseTable([{ label: '59', unitPrice: 400 }], 1000, 0.9, 0.8, -10);
+  assert.ok(Math.abs(table[0].newPrice - 360) < 1e-6, `newPrice=${table[0].newPrice}`);
+});
+
+run('calcRepresentativeOrAverageUnitPrice: 최다세대 평형 비중이 65% 이상이면 대표평형을 반환한다', () => {
+  const rows = [
+    { label: '59', count: 700, oldPrice: 400 },
+    { label: '74', count: 200, oldPrice: 500 },
+    { label: '84', count: 100, oldPrice: 600 },
+  ];
+  const r = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rows, 0.65);
+  assert.strictEqual(r.mode, 'representative');
+  assert.strictEqual(r.label, '59');
+  assert.strictEqual(r.oldPrice, 400);
+  assert.ok(Math.abs(r.oldPricePerPyeong - 16) < 1e-6, `oldPricePerPyeong=${r.oldPricePerPyeong}`); // 400/25평
+});
+
+run('calcRepresentativeOrAverageUnitPrice: 최다세대 비중이 65% 미만이면 세대수가중 평균을 반환한다', () => {
+  const rows = [
+    { label: '59', count: 300, oldPrice: 375 },
+    { label: '74', count: 400, oldPrice: 600 },
+    { label: '84', count: 300, oldPrice: 825 },
+  ];
+  const r = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rows, 0.65);
+  assert.strictEqual(r.mode, 'average');
+  assert.strictEqual(r.label, null);
+  assert.ok(Math.abs(r.oldPrice - 600) < 1e-6, `oldPrice=${r.oldPrice}`); // 600,000/1,000세대
+  // 평균 평당가 = 총액(600,000) / 총평형면적(300*25+400*30+300*33=29,400평)
+  assert.ok(Math.abs(r.oldPricePerPyeong - (600000 / 29400)) < 1e-6, `oldPricePerPyeong=${r.oldPricePerPyeong}`);
+});
+
+run('calcRepresentativeOrAverageUnitPrice: threshold를 낮추면 같은 데이터도 대표평형으로 분기할 수 있다', () => {
+  const rows = [
+    { label: '59', count: 300, oldPrice: 375 },
+    { label: '74', count: 400, oldPrice: 600 },
+    { label: '84', count: 300, oldPrice: 825 },
+  ];
+  const r = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rows, 0.3);
+  assert.strictEqual(r.mode, 'representative');
+  assert.strictEqual(r.label, '74');
+});
+
+run('calcRepresentativeOrAverageUnitPrice: newPrice를 생략하면 oldPrice와 같은 값을 쓴다(변경 전이면 화살표 없이 단일값)', () => {
+  const rows = [{ label: '59', count: 700, oldPrice: 400 }, { label: '84', count: 300, oldPrice: 600 }];
+  const r = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rows, 0.65);
+  assert.strictEqual(r.newPrice, r.oldPrice);
+  assert.strictEqual(r.newPricePerPyeong, r.oldPricePerPyeong);
+});
+
+run('calcRepresentativeOrAverageUnitPrice: newPrice가 주어지면 대표/평균 로직 그대로 newPrice 쪽도 계산한다', () => {
+  const rows = [
+    { label: '59', count: 700, oldPrice: 400, newPrice: 440 },
+    { label: '84', count: 300, oldPrice: 600, newPrice: 660 },
+  ];
+  const r = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rows, 0.65);
+  assert.strictEqual(r.mode, 'representative');
+  assert.strictEqual(r.newPrice, 440);
+  assert.ok(Math.abs(r.newPricePerPyeong - 17.6) < 1e-6, `newPricePerPyeong=${r.newPricePerPyeong}`); // 440/25평
+});
+
+run('calcRepresentativeOrAverageUnitPrice: 세대수가 모두 0이거나 빈 배열이면 null을 반환한다', () => {
+  assert.strictEqual(window.RateCalc.calcRepresentativeOrAverageUnitPrice([], 0.65), null);
+  assert.strictEqual(window.RateCalc.calcRepresentativeOrAverageUnitPrice([{ label: '59', count: 0, oldPrice: 400 }], 0.65), null);
+});

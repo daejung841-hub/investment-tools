@@ -145,6 +145,65 @@
     });
   }
 
+  // 목표값찾기 "직접 입력 시뮬레이션": 사용자가 임의로 넣은 인상률(ratePct, %)을 모든 평형에
+  // 동일 적용한다. calcMemberPriceIncreaseTable과 달리 목표 비례율이 100% 고정이 아니므로
+  // (직접 입력한 인상률이 낳는 결과 비례율은 그때그때 다르다) 호출 쪽이 계산한 newRate를 그대로 받는다.
+  function calcCustomRateIncreaseTable(unitRows, myAppraisal, currentRate, newRate, ratePct){
+    const rightsCurrent = myAppraisal * currentRate;
+    const rightsNew = myAppraisal * newRate;
+    const ratio = ratePct / 100;
+    return (unitRows || []).map(row => {
+      const newPrice = row.unitPrice * (1 + ratio);
+      return {
+        label: row.label,
+        oldPrice: row.unitPrice,
+        newPrice,
+        oldDues: row.unitPrice - rightsCurrent,
+        newDues: newPrice - rightsNew,
+      };
+    });
+  }
+
+  // 평형별 표 전체를 대표하는 "평당분양가" 한 줄 요약: 최다세대 평형의 세대수 비중이
+  // threshold(기본 65%) 이상이면 그 평형을 대표값으로, 미만이면 세대수가중 평균을 반환한다.
+  // unitRows: [{label, count, oldPrice, newPrice?}] — newPrice를 생략하면 oldPrice와 같은 값을 쓴다
+  // (변경 전/미입력 상태에서는 화살표 없이 단일값으로 표시할 수 있도록).
+  function calcRepresentativeOrAverageUnitPrice(unitRows, threshold){
+    const th = threshold == null ? 0.65 : threshold;
+    const rows = (unitRows || []).filter(r => r.count > 0);
+    if (!rows.length) return null;
+    const totalCount = rows.reduce((sum, r) => sum + r.count, 0);
+    const rep = rows.reduce((max, r) => (r.count > max.count ? r : max));
+    const share = totalCount ? rep.count / totalCount : 0;
+    const pyeongOf = (label) => calcPyeong(parseFloat(label));
+
+    if (share >= th){
+      const oldPrice = rep.oldPrice;
+      const newPrice = rep.newPrice != null ? rep.newPrice : rep.oldPrice;
+      const pyeong = pyeongOf(rep.label);
+      return {
+        mode: 'representative', label: rep.label, share, oldPrice, newPrice,
+        oldPricePerPyeong: pyeong ? oldPrice / pyeong : null,
+        newPricePerPyeong: pyeong ? newPrice / pyeong : null,
+      };
+    }
+
+    let totalOldAmount = 0, totalNewAmount = 0, totalPyeong = 0;
+    rows.forEach(r => {
+      const pyeong = pyeongOf(r.label);
+      totalOldAmount += r.count * r.oldPrice;
+      totalNewAmount += r.count * (r.newPrice != null ? r.newPrice : r.oldPrice);
+      totalPyeong += r.count * pyeong;
+    });
+    return {
+      mode: 'average', label: null, share,
+      oldPrice: totalOldAmount / totalCount,
+      newPrice: totalNewAmount / totalCount,
+      oldPricePerPyeong: totalPyeong ? totalOldAmount / totalPyeong : null,
+      newPricePerPyeong: totalPyeong ? totalNewAmount / totalPyeong : null,
+    };
+  }
+
   const api = {
     calcProportion, calcScenario, sumUnitRows, pctToAmount, amountToPct,
     manwonToWon, wonToManwon, calcTotalConstructionCost, calcOtherIncome, calcOtherExpense,
@@ -152,6 +211,7 @@
     calcAverageMultiplier, calcPyeong, solveReserveShiftToTarget, solveMemberPriceIncreaseToTarget,
     calcUnitComparisonTable, calcMemberPriceIncreaseTable, calcAreaFromCost, calcPricePerPyeongFromCost,
     calcOtherExpenseChangeFromRate, calcSimplifiedDelta,
+    calcCustomRateIncreaseTable, calcRepresentativeOrAverageUnitPrice,
   };
   if (typeof module !== 'undefined' && module.exports){
     module.exports = api;

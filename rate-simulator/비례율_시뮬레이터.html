@@ -122,6 +122,8 @@ button{cursor:pointer;}
 .eok-hint{color:var(--ink-faint);font-size:11px;font-weight:400;margin-left:2px;}
 /* 카드 안의 소제목(조합원분양/일반분양/평형별 분담금 비교/A안·B안 등) 여백을 하나로 통일 */
 .section-title{font-size:13px;margin:16px 0 8px;}
+.pyeong-price-hint{color:var(--ink-faint);font-size:11px;font-weight:400;margin-left:4px;white-space:nowrap;}
+.unit-price-summary{font-size:11.5px;color:var(--ink-muted);margin:2px 0 8px;}
 .unit-rows{display:flex;flex-direction:column;gap:8px;}
 .unit-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0;}
 .unit-row input{border:1px solid var(--border-strong);background:var(--surface-alt);color:var(--ink);border-radius:8px;padding:6px 8px;font-family:var(--font-mono);font-size:12.5px;}
@@ -295,6 +297,7 @@ button{cursor:pointer;}
             <input type="text" id="c_repNewPrice" class="value-input" placeholder="예상 분양가(만원)">
           </div>
           <div class="hint" id="repUnitHint" style="font-size:11px;color:var(--ink-faint);margin-top:4px;"></div>
+          <div id="repUnitPriceSummary" class="unit-price-summary"></div>
         </div>
         <div class="field">
           <label>공사비 — 평당공사비</label>
@@ -390,6 +393,13 @@ button{cursor:pointer;}
     <div class="card narrow">
       <h2>시뮬레이션 — 목표값찾기</h2>
       <div id="targetFinderBody"></div>
+      <div class="field-row" style="margin-top:12px;">
+        <div class="field">
+          <label>조합원분양가 인상률(%) 직접 입력해보기</label>
+          <input type="text" id="customRatePct" placeholder="예: 5">
+        </div>
+      </div>
+      <div id="customRateBody"></div>
     </div>
     </div>
   </div>
@@ -737,6 +747,24 @@ button{cursor:pointer;}
       }
     }
 
+    // 일반분양가 대표평형/평균 요약 — 조합원 쪽(buildMemberPriceSummaryLine)과 같은 계산 함수를 재사용하되,
+    // 일반분양은 별도 시나리오 입력(대표 평형 예상 변경 후 분양가)이 있을 때만 기존→변경 화살표를 보여준다.
+    const priceSummaryEl = document.getElementById('repUnitPriceSummary');
+    if (!rows.length){
+      priceSummaryEl.innerHTML = '';
+    } else {
+      const newPriceManwon = toNumber(document.getElementById('c_repNewPrice').value);
+      let rowsForSummary;
+      if (rep && newPriceManwon){
+        const newPriceWon = window.RateCalc.manwonToWon(newPriceManwon);
+        const rate = window.RateCalc.calcRateFromRepresentativeUnit(rep.unitPrice, newPriceWon);
+        rowsForSummary = rows.map(r => ({ label: r.label, count: r.count, oldPrice: r.unitPrice, newPrice: r.unitPrice * (1 + rate / 100) }));
+      } else {
+        rowsForSummary = rows.map(r => ({ label: r.label, count: r.count, oldPrice: r.unitPrice }));
+      }
+      priceSummaryEl.innerHTML = buildGeneralPriceSummaryLine(rowsForSummary);
+    }
+
     const costHint = document.getElementById('repCostHint');
     const s = readBaselineState();
     document.getElementById('curPricePerPyeongDisplay').value = s.pricePerPyeong ? formatManwon(s.pricePerPyeong) : '';
@@ -1071,12 +1099,64 @@ button{cursor:pointer;}
 
     renderTargetFinder(change.A1, change.B1, s.C, r.rate1, s.memberCount, r.perMember, myAppraisal, s.memberJeobun);
     renderUnitComparisonTable(myAppraisal, r.rate1);
+    renderCustomRateSimulation(change.A1, change.B1, s.C, r.rate1, myAppraisal);
   }
 
   function buildDuesSummaryLine(perMember){
     if (perMember == null || !Number.isFinite(perMember)) return '';
     const label = perMember < 0 ? '환급금' : '추가분담금';
     return '<div class="easy-summary" style="margin-top:0;">인당 조합원 ' + label + '은 ' + toManwon(Math.abs(perMember)) + eokHint(Math.abs(perMember)) + ' 발생 가능할 것으로 추정됩니다.</div>';
+  }
+
+  // 평형(label, 예: "59"/"59A"/"84 보류지")에서 앞쪽 숫자만 뽑아 calcPyeong에 넘긴다.
+  // 평당가를 계산할 수 없으면(면적 인식 실패) 빈 문자열을 반환해 조용히 생략한다.
+  function pyeongHintSingle(label, won){
+    const sqm = parseFloat(label);
+    if (!Number.isFinite(sqm) || !won) return '';
+    const pyeong = window.RateCalc.calcPyeong(sqm);
+    if (!pyeong) return '';
+    const perPyeongManwon = Math.round(window.RateCalc.wonToManwon(won) / pyeong);
+    return '<span class="pyeong-price-hint">(평당 ' + perPyeongManwon.toLocaleString('ko-KR') + '만원)</span>';
+  }
+
+  function pyeongHintPair(label, oldWon, newWon){
+    const sqm = parseFloat(label);
+    if (!Number.isFinite(sqm) || !oldWon) return '';
+    const pyeong = window.RateCalc.calcPyeong(sqm);
+    if (!pyeong) return '';
+    const oldPerPyeong = Math.round(window.RateCalc.wonToManwon(oldWon) / pyeong);
+    const newPerPyeong = Math.round(window.RateCalc.wonToManwon(newWon) / pyeong);
+    return '<span class="pyeong-price-hint">(평당 ' + oldPerPyeong.toLocaleString('ko-KR') + '만원 → ' + newPerPyeong.toLocaleString('ko-KR') + '만원)</span>';
+  }
+
+  // 조합원분양가 표(3단계 결과/A안/B안/직접 입력 시뮬레이션) 전체를 대표하는 "평당분양가" 한 줄 요약.
+  // 최다세대 평형 비중이 65% 이상이면 그 평형, 미만이면 세대수가중 평균으로 계산한다(calcRepresentativeOrAverageUnitPrice 재사용).
+  function buildMemberPriceSummaryLine(rows){
+    const r = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rows, 0.65);
+    if (!r || r.oldPricePerPyeong == null) return '';
+    const oldText = Math.round(window.RateCalc.wonToManwon(r.oldPricePerPyeong)).toLocaleString('ko-KR') + '만원';
+    const hasChange = r.newPricePerPyeong != null && Math.round(r.newPrice) !== Math.round(r.oldPrice);
+    const valueText = hasChange
+      ? oldText + ' → ' + Math.round(window.RateCalc.wonToManwon(r.newPricePerPyeong)).toLocaleString('ko-KR') + '만원'
+      : oldText;
+    const prefix = r.mode === 'representative' ? '대표평형(' + r.label + '㎡) 평당분양가: ' : '평균 평당분양가: ';
+    return '<div class="unit-price-summary">' + prefix + valueText + '</div>';
+  }
+
+  // 일반분양가 표(2단계 대표 평형 위젯) 요약: 조합원 쪽과 달리 총액과 평당가를 함께 보여준다.
+  function buildGeneralPriceSummaryLine(rows){
+    const r = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rows, 0.65);
+    if (!r || r.oldPricePerPyeong == null) return '';
+    const hasChange = r.newPricePerPyeong != null && Math.round(r.newPrice) !== Math.round(r.oldPrice);
+    const priceText = hasChange
+      ? formatManwon(r.oldPrice) + eokHintText(r.oldPrice) + ' → ' + formatManwon(r.newPrice) + eokHintText(r.newPrice)
+      : formatManwon(r.oldPrice) + eokHintText(r.oldPrice);
+    const perPyeongOld = Math.round(window.RateCalc.wonToManwon(r.oldPricePerPyeong)).toLocaleString('ko-KR') + '만원';
+    const perPyeongText = hasChange
+      ? perPyeongOld + ' → ' + Math.round(window.RateCalc.wonToManwon(r.newPricePerPyeong)).toLocaleString('ko-KR') + '만원'
+      : perPyeongOld;
+    const prefix = r.mode === 'representative' ? '대표평형(' + r.label + '㎡) 일반분양가: ' : '평균 일반분양가: ';
+    return prefix + priceText + ' (평당 ' + perPyeongText + ')';
   }
 
   // 평형별 분담금 비교 표(평형|조합원분양가|감정가|비례율|권리가액|분담금)를 만든다.
@@ -1086,7 +1166,7 @@ button{cursor:pointer;}
       '<tr><td><strong>평형</strong></td><td><strong>조합원분양가</strong></td><td><strong>감정가</strong></td><td><strong>비례율</strong></td><td><strong>권리가액</strong></td><td><strong>분담금</strong></td></tr>' +
       table.map((row, i) =>
         '<tr><td>' + row.label + '</td>' +
-        '<td>' + formatManwon(row.memberPrice) + eokHint(row.memberPrice) + '</td>' +
+        '<td>' + formatManwon(row.memberPrice) + eokHint(row.memberPrice) + pyeongHintSingle(row.label, row.memberPrice) + '</td>' +
         (i === 0 ? '<td rowspan="' + table.length + '">' + formatManwon(myAppraisal) + eokHint(myAppraisal) + '</td>' : '') +
         (i === 0 ? '<td rowspan="' + table.length + '">' + formatPct(rate1) + '</td>' : '') +
         '<td>' + formatManwon(row.rightsValue) + eokHint(row.rightsValue) + '</td>' +
@@ -1095,10 +1175,23 @@ button{cursor:pointer;}
       '</table>';
   }
 
+  // "조합원분양가(기존→변경)" 2컬럼 표(B안/직접 입력 시뮬레이션 공용).
+  function buildPriceChangeTableHtml(table){
+    return '<table class="detail-table">' +
+      '<tr><td><strong>평형</strong></td><td><strong>조합원분양가(기존→변경)</strong></td><td><strong>분담금(기존→변경)</strong></td></tr>' +
+      table.map(row =>
+        '<tr><td>' + row.label + '</td>' +
+        '<td>' + formatManwon(row.oldPrice) + eokHint(row.oldPrice) + ' → ' + formatManwon(row.newPrice) + eokHint(row.newPrice) + pyeongHintPair(row.label, row.oldPrice, row.newPrice) + '</td>' +
+        '<td>' + formatManwon(row.oldDues) + eokHint(row.oldDues) + ' → ' + formatManwon(row.newDues) + eokHint(row.newDues) + '</td></tr>'
+      ).join('') +
+      '</table>';
+  }
+
   function getMemberRowsForComparison(){
     return Array.from(document.getElementById('a_memberRows').querySelectorAll('.unit-row'))
       .map(row => ({
         label: row.querySelector('.label-input').value,
+        count: toNumber(row.querySelector('.count-input').value),
         unitPrice: toWon(row.querySelector('.price-input').value),
       }))
       .filter(row => row.label && row.unitPrice);
@@ -1118,6 +1211,7 @@ button{cursor:pointer;}
     const table = window.RateCalc.calcUnitComparisonTable(memberRows, myAppraisal, rate1);
     el.innerHTML =
       '<h3 class="section-title">평형별 분담금 비교 (감정가 ' + formatManwon(myAppraisal) + eokHint(myAppraisal) + ' 기준, 권리가액은 고정)</h3>' +
+      buildMemberPriceSummaryLine(memberRows.map(r => ({ label: r.label, count: r.count, oldPrice: r.unitPrice }))) +
       buildUnitComparisonTableHtml(table, myAppraisal, rate1);
   }
 
@@ -1154,25 +1248,58 @@ button{cursor:pointer;}
         if (memberRows.length){
           const aTable = window.RateCalc.calcUnitComparisonTable(memberRows, myAppraisal, rate1);
           const bTable = window.RateCalc.calcMemberPriceIncreaseTable(memberRows, myAppraisal, rate1, increase, memberJeobun);
+          const bRatePct = memberJeobun ? (increase / memberJeobun) * 100 : 0;
+          const bRowsForSummary = bTable.map((row, i) => ({ label: row.label, count: memberRows[i].count, oldPrice: row.oldPrice, newPrice: row.newPrice }));
           body +=
             '<h3 class="section-title">A안: 비례율 ' + formatPct(rate1) + '로 하락' +
             (perMemberDues != null ? ', 인당 추가분담금 ' + formatManwon(Math.abs(perMemberDues)) + eokHint(perMemberDues) : '') + '</h3>' +
+            buildMemberPriceSummaryLine(memberRows.map(r => ({ label: r.label, count: r.count, oldPrice: r.unitPrice }))) +
             buildUnitComparisonTableHtml(aTable, myAppraisal, rate1) +
-            '<h3 class="section-title">B안: 비례율 100% 유지, 조합원분양가 총 ' + formatManwon(increase) + eokHint(increase) + ' 인상 필요</h3>' +
-            '<table class="detail-table">' +
-            '<tr><td><strong>평형</strong></td><td><strong>조합원분양가(기존→변경)</strong></td><td><strong>분담금(기존→변경)</strong></td></tr>' +
-            bTable.map(row =>
-              '<tr><td>' + row.label + '</td>' +
-              '<td>' + formatManwon(row.oldPrice) + eokHint(row.oldPrice) + ' → ' + formatManwon(row.newPrice) + eokHint(row.newPrice) + '</td>' +
-              '<td>' + formatManwon(row.oldDues) + eokHint(row.oldDues) + ' → ' + formatManwon(row.newDues) + eokHint(row.newDues) + '</td></tr>'
-            ).join('') +
-            '</table>';
+            '<h3 class="section-title">B안: 비례율 100% 유지, 조합원분양가 총 ' + formatManwon(increase) + eokHint(increase) + ' 인상 필요(약 ' + bRatePct.toFixed(2) + '%)</h3>' +
+            buildMemberPriceSummaryLine(bRowsForSummary) +
+            buildPriceChangeTableHtml(bTable);
         }
       }
     } else {
       body = '<div class="hint" style="font-size:11.5px;color:var(--ink-faint);">비례율이 이미 100%에 근접합니다.</div>';
     }
     el.innerHTML = summaryLine + body;
+  }
+
+  // 목표값찾기의 100% 자동 목표값찾기(A안/B안)와는 별개로, 사용자가 직접 넣은 인상률(%)을
+  // 조합원분양가 전체에 동일 적용했을 때의 결과를 실시간으로 보여준다(둘 다 동시에 표시).
+  function renderCustomRateSimulation(A1, B1, C, rate1, myAppraisal){
+    const el = document.getElementById('customRateBody');
+    if (!el) return;
+    const ratePctRaw = document.getElementById('customRatePct').value;
+    if (rate1 == null || !C || myAppraisal == null || ratePctRaw === ''){
+      el.innerHTML = '';
+      return;
+    }
+    const ratePct = toNumber(ratePctRaw);
+    const s = readBaselineState();
+    const memberRows = getMemberRowsForComparison();
+    if (!memberRows.length || !s.memberJeobun){
+      el.innerHTML = '';
+      return;
+    }
+    const increaseWon = s.memberJeobun * (ratePct / 100);
+    const newRate = window.RateCalc.calcProportion({ C, A: A1 + increaseWon, B: B1 });
+    if (newRate == null){
+      el.innerHTML = '';
+      return;
+    }
+    const table = window.RateCalc.calcCustomRateIncreaseTable(memberRows, myAppraisal, rate1, newRate, ratePct);
+    const rowsForSummary = table.map((row, i) => ({ label: row.label, count: memberRows[i].count, oldPrice: row.oldPrice, newPrice: row.newPrice }));
+    // A안(현재 시나리오) 대비 인당 분담금 변화 = 조합원분양가 인상분(increaseWon)이 그대로 Z에 더해지는 것과 같다
+    // (공사비/총지출은 이 시뮬레이션에서 건드리지 않으므로 calcScenario로 "A안→직접입력" 증분만 뽑아낸다).
+    const deltaScenario = window.RateCalc.calcScenario({ C, A0: A1, B0: B1, A1: A1 + increaseWon, B1, memberCount: s.memberCount });
+    const perMemberNew = deltaScenario.perMember;
+    el.innerHTML =
+      '<h3 class="section-title">직접 입력 시뮬레이션: 조합원분양가 ' + (ratePct >= 0 ? '+' : '') + ratePct.toFixed(2) + '% 인상 시 비례율 ' + formatPct(newRate) + '</h3>' +
+      (perMemberNew != null ? '<div class="unit-price-summary">A안 대비 조합원 1인당 분담금 변화: ' + (perMemberNew >= 0 ? '+' : '') + formatManwon(perMemberNew) + eokHint(perMemberNew) + '</div>' : '') +
+      buildMemberPriceSummaryLine(rowsForSummary) +
+      buildPriceChangeTableHtml(table);
   }
 
   function setupReferenceMapping(){
@@ -1597,6 +1724,40 @@ button{cursor:pointer;}
     return (neg ? '-' : '') + body;
   }
 
+  // 평형 라벨(셀 참조 또는 INDEX(...) 같은 값 표현식)에서 평(pyeong)을 구하는 엑셀 수식 조각.
+  // calcPyeong의 5개 기준점(39/49/59/74/84㎡)과 평균 배수 폴백을 그대로 옮긴 것 —
+  // 라벨이 "59A"처럼 순수 숫자가 아니면 폴백 나눗셈에서 #VALUE! 에러가 나므로, 이 조각을
+  // 쓰는 쪽에서 반드시 IFERROR로 감싸 조용히 빈 값으로 처리한다.
+  const PYEONG_AVG_MULTIPLIER = window.RateCalc.calcAverageMultiplier();
+  // 평형 라벨 셀은 항상 텍스트로 저장되는데(HTML input.value), Excel은 "59"=59를 FALSE로
+  // 판정해(암묵적 형변환 없음) 아래 기준점 비교가 전부 실패하고 매번 근사 폴백으로 빠지는
+  // 문제가 있었다 — labelExpr에 *1을 곱해 숫자로 강제 변환한 뒤 비교한다. 산술 연산자(*)는
+  // SUMPRODUCT 같은 배열 컨텍스트에서도 문자열 숫자를 안정적으로 원소별 변환해주므로
+  // (IF/VALUE 조합보다 신뢰도가 높다) 스칼라·배열 양쪽에서 동일하게 동작한다.
+  function pyeongFormulaExpr(labelExpr){
+    const n = '(' + labelExpr + '*1)';
+    return 'IF(' + n + '=39,18,IF(' + n + '=49,22,IF(' + n + '=59,25,IF(' + n + '=74,30,IF(' + n + '=84,33,' + n + '/' + PYEONG_AVG_MULTIPLIER.toFixed(10) + ')))))';
+  }
+  // pyeongFormulaExpr와 같은 계산을 SUMPRODUCT의 배열 인자로 안전하게 쓸 수 있는 형태로 바꾼 것.
+  // 중첩 IF를 SUMPRODUCT 두 번째 인자로 넘기면 실제 Excel(CSE 없이 일반 수식으로 쓴 경우)에서
+  // 배열 브로드캐스트가 실패해 #VALUE!가 나는 것을 COM 테스트로 확인했다 — bool*숫자 합산 방식은
+  // SUMPRODUCT가 원래 지원하는 가장 안정적인 배열 관용구라 대신 사용한다.
+  function pyeongArrayCoefficientExpr(labelRangeExpr){
+    const n = '(' + labelRangeExpr + '*1)';
+    const exact = [[39, 18], [49, 22], [59, 25], [74, 30], [84, 33]];
+    const exactSum = exact.map(([sqm, py]) => '(' + n + '=' + sqm + ')*' + py).join('+');
+    const noneMatch = exact.map(([sqm]) => '(' + n + '<>' + sqm + ')').join('*');
+    return '(' + exactSum + '+' + noneMatch + '*(' + n + '/' + PYEONG_AVG_MULTIPLIER.toFixed(10) + '))';
+  }
+  // 평형 라벨이 "59A"/"84 보류지"처럼 텍스트가 섞여 있어도(웹 화면과 동일하게) 앞쪽 숫자만 읽는다.
+  function pyeongHintPreview(label, priceManwon){
+    const sqm = parseFloat(label);
+    if (!Number.isFinite(sqm) || !priceManwon) return '';
+    const pyeong = window.RateCalc.calcPyeong(sqm);
+    if (!pyeong) return '';
+    return '(평당 ' + Math.round(priceManwon / pyeong).toLocaleString('ko-KR') + '만원)';
+  }
+
   document.getElementById('btnExportExcel').addEventListener('click', async () => {
     // writeField가 만든 자리표시자(0)로는 억단위 미리보기가 "0만원"으로 캐시되므로, 실제
     // 값을 formula 덮어쓰기로 뒤늦게 채우는 행들은 이 함수로 힌트 셀의 캐시도 같이 갱신한다.
@@ -1786,19 +1947,34 @@ button{cursor:pointer;}
       writer.writeSection(title);
       writer.writeTableHeader(['평형', '세대수', '세대당 분양가(만원)']);
       const dataRows = [];
+      const rowsForSummary = []; // Task 56: 대표평형/평균 평당분양가 요약용 캐시(label/count/oldPrice, 만원)
       Array.from(document.getElementById(containerId).querySelectorAll('.unit-row')).forEach(row => {
         const rr = writer.nextRow();
         dataRows.push(rr);
-        const label = ws.getCell(c[0] + rr); label.value = row.querySelector('.label-input').value;
+        const rowLabel = row.querySelector('.label-input').value;
+        const rowCount = toNumber(row.querySelector('.count-input').value);
+        const rowPriceManwon = toNumber(row.querySelector('.price-input').value);
+        rowsForSummary.push({ label: rowLabel, count: rowCount, oldPrice: rowPriceManwon });
+        const label = ws.getCell(c[0] + rr); label.value = rowLabel;
         fillCell(label, XL_COLOR.fixed, XL_COLOR.fixedText);
-        const count = ws.getCell(c[1] + rr); count.value = toNumber(row.querySelector('.count-input').value);
+        const count = ws.getCell(c[1] + rr); count.value = rowCount;
         fillCell(count, XL_COLOR.fixed, XL_COLOR.fixedText, { numFmt: '#,##0', align: { horizontal: 'right' } });
-        const price = ws.getCell(c[2] + rr); price.value = toNumber(row.querySelector('.price-input').value);
+        const price = ws.getCell(c[2] + rr); price.value = rowPriceManwon;
         fillCell(price, XL_COLOR.fixed, XL_COLOR.fixedText, { numFmt: '#,##0', align: { horizontal: 'right' } });
+        // 평형별 평당분양가 병기(웹 화면의 pyeongHintSingle과 동일 로직) — 라벨이 순수 숫자가
+        // 아니면(예: "59A") 폴백 나눗셈에서 에러가 날 수 있어 IFERROR로 감싸 조용히 비운다.
+        const pyeongHintCell = ws.getCell(c[3] + rr);
+        pyeongHintCell.value = {
+          formula: 'IFERROR("(평당 "&TEXT(ROUND(' + c[2] + rr + '/(' + pyeongFormulaExpr(c[0] + rr) + '),0),"#,##0")&"만원)","")',
+          result: pyeongHintPreview(rowLabel, rowPriceManwon),
+        };
+        pyeongHintCell.font = { italic: true, size: 10.5, color: { argb: XL_COLOR.inkMuted } };
+        pyeongHintCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: false, indent: 0 };
       });
       const sumRow = writer.nextRow();
-      ws.getCell(c[0] + sumRow).value = '합계(자동계산)';
-      ws.getCell(c[0] + sumRow).font = { italic: true, size: 12, color: { argb: XL_COLOR.autoText } };
+      const sumLabelCell = ws.getCell(c[0] + sumRow);
+      sumLabelCell.font = { italic: true, size: 12, color: { argb: XL_COLOR.autoText } };
+      sumLabelCell.alignment = { vertical: 'middle', wrapText: true };
       const countSumCell = ws.getCell(c[1] + sumRow);
       const priceSumCell = ws.getCell(c[2] + sumRow);
       if (dataRows.length){
@@ -1818,11 +1994,41 @@ button{cursor:pointer;}
       priceSumHintCell.value = { formula: eokTextFormula(c[2] + sumRow), result: eokPreview(dataRows.length ? (cachedAmountManwon || 0) : null) };
       priceSumHintCell.font = { italic: true, size: 10.5, color: { argb: XL_COLOR.inkMuted } };
       priceSumHintCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: false, indent: 0 };
+
+      // 대표평형(세대수 비중 65%↑)/평균 평당분양가 한 줄 요약 (Task 56, 웹 화면과 같은 함수 재사용).
+      // 별도 행을 새로 만들면 세로 공간이 늘어 85% 줌 한 화면 fit이 깨지므로, "합계(자동계산)"
+      // 라벨 셀에 " · "로 이어 붙인다(라벨 열은 wrapText라 길어지면 자동으로 줄바꿈된다).
+      if (dataRows.length){
+        const first = dataRows[0], last = dataRows[dataRows.length - 1];
+        const labelRange = c[0] + first + ':' + c[0] + last;
+        const countRange = c[1] + first + ':' + c[1] + last;
+        const priceRange = c[2] + first + ':' + c[2] + last;
+        const maxCountExpr = 'MAX(' + countRange + ')';
+        const matchPosExpr = 'MATCH(' + maxCountExpr + ',' + countRange + ',0)';
+        const repLabelExpr = 'INDEX(' + labelRange + ',' + matchPosExpr + ')';
+        const repPriceExpr = 'INDEX(' + priceRange + ',' + matchPosExpr + ')';
+        const repPerPyeongExpr = 'ROUND(' + repPriceExpr + '/(' + pyeongFormulaExpr(repLabelExpr) + '),0)';
+        const totalPyeongExpr = 'SUMPRODUCT(' + countRange + ',' + pyeongArrayCoefficientExpr(labelRange) + ')';
+        const avgPerPyeongExpr = 'ROUND(' + c[2] + sumRow + '/(' + totalPyeongExpr + '),0)';
+        const shareExpr = maxCountExpr + '/' + c[1] + sumRow;
+        const summaryFormula = 'IFERROR(IF(' + shareExpr + '>=0.65,' +
+          '"대표평형("&' + repLabelExpr + '&"㎡) 평당분양가: "&TEXT(' + repPerPyeongExpr + ',"#,##0")&"만원",' +
+          '"평균 평당분양가: "&TEXT(' + avgPerPyeongExpr + ',"#,##0")&"만원"),"")';
+        const cachedSummary = window.RateCalc.calcRepresentativeOrAverageUnitPrice(rowsForSummary, 0.65);
+        const cachedText = (cachedSummary && cachedSummary.oldPricePerPyeong != null)
+          ? (cachedSummary.mode === 'representative'
+              ? '대표평형(' + cachedSummary.label + '㎡) 평당분양가: ' + Math.round(cachedSummary.oldPricePerPyeong).toLocaleString('ko-KR') + '만원'
+              : '평균 평당분양가: ' + Math.round(cachedSummary.oldPricePerPyeong).toLocaleString('ko-KR') + '만원')
+          : '';
+        sumLabelCell.value = { formula: '"합계(자동계산) · "&(' + summaryFormula + ')', result: '합계(자동계산) · ' + cachedText };
+      } else {
+        sumLabelCell.value = '합계(자동계산)';
+      }
       if (!skipTrailingSpacer) writer.writeSpacer(); // 다음이 바로 새 ■ 섹션 제목(자체 굵은 밑줄)이면 굳이 안 비워도 구분된다.
       return { dataRows, sumRow, cols: c };
     }
 
-    const memberTable = writeUnitTable(M, '■ 조합원분양 평형별 (초록색 칸=확정된 기본정보)', 'a_memberRows', s.memberCount, window.RateCalc.wonToManwon(s.memberJeobun));
+    const memberTable = writeUnitTable(M, '■ 조합원분양 평형별 (초록색 칸=확정된 기본정보)', 'a_memberRows', s.memberCount, window.RateCalc.wonToManwon(s.memberJeobun), true);
     const generalTable = writeUnitTable(M, '■ 일반분양 평형별 (초록색 칸=확정된 기본정보)', 'a_generalRows', s.generalUnits, window.RateCalc.wonToManwon(s.memberIlban), true);
 
     // ── M열: 변경값 (입력) — "무엇의 무엇을 바꾸는지" 바로 옆에 현재값을 자동표시 ────────
@@ -1849,7 +2055,9 @@ button{cursor:pointer;}
     const newPricePerPyeongRow = M.writeField('└ 예상 평당공사비(만원)', document.getElementById('c_repNewPricePerPyeong').value ? toNumber(document.getElementById('c_repNewPricePerPyeong').value) : '', 'input', '#,##0');
     const etcChangeRow = M.writeField('기타사업비 변경액(만원)', document.getElementById('c_etcInput').value ? toNumber(document.getElementById('c_etcInput').value) : '', 'input', '#,##0', { eok: true });
     const appraisalRow = M.writeField('감정가(만원)', myAppraisal != null ? window.RateCalc.wonToManwon(myAppraisal) : '', 'input', '#,##0', { eok: true });
-    M.writeSpacer();
+    const customRatePctRaw = document.getElementById('customRatePct').value;
+    const customRateRow = M.writeField('└ [직접 입력] 조합원분양가 인상률(%)', customRatePctRaw !== '' ? toNumber(customRatePctRaw) : '', 'input', '0.00');
+    // M열은 여기서 끝(뒤에 이어질 섹션이 없음) — 트레일링 빈 줄은 세로 공간만 차지하므로 생략한다.
 
     // ── L열: 자동계산 파생값 (결과 요약 수식이 참조) ─────────────────────────────
     // 일반분양가·평당공사비 변경은 "대표 평형(구간) 기준 비율을 전체에 동일 적용"하는 근사 모델이다
@@ -1924,7 +2132,7 @@ button{cursor:pointer;}
           duesCell.value = { formula: 'L' + rr + '-M' + rr, result: window.RateCalc.wonToManwon(row.dues) };
           fillCell(duesCell, XL_COLOR.auto, XL_COLOR.autoText, { numFmt: '#,##0', align: { horizontal: 'right' } });
         });
-        R.writeSpacer();
+        // 바로 다음이 새 ■ 섹션 제목(자체 굵은 밑줄)이라 빈 줄 없이 붙여도 구분된다.
       }
     }
 
@@ -1947,6 +2155,30 @@ button{cursor:pointer;}
       ws.getCell('L' + perDiffRow).value = { formula: 'L' + diffRow + '/B' + memberCountRow, result: s.memberCount ? Math.round((xlA1Won - xlB1Won - s.C) / 10000 / s.memberCount) : 0 };
       refreshEokPreview('N', perDiffRow, s.memberCount ? Math.round((xlA1Won - xlB1Won - s.C) / 10000 / s.memberCount) : 0);
       // 바로 다음이 새 ■ 섹션 제목(자체 굵은 밑줄)이라 빈 줄 없이 붙여도 구분된다.
+    }
+
+    // ── R열: 직접 입력 시뮬레이션 (M열의 인상률(%) 입력 칸을 바꾸면 실시간 재계산, 자동계산) ─────
+    // 목표값찾기(100% 고정)와 별개로, 사용자가 넣은 인상률만큼 조합원분양가 전체를 올렸을 때의
+    // 결과 비례율/인당 분담금 변화를 보여준다 — 조합원분양가만 바뀌므로 총사업비(B)는 그대로다.
+    {
+      const customIncreaseExpr = 'G' + customRateRow + '/100*H' + memberTable.sumRow;
+      R.writeSection('■ 직접 입력 시뮬레이션 (M열 인상률(%) 입력 칸 연동, 자동계산)');
+      const customRatePctVal = customRatePctRaw !== '' ? toNumber(customRatePctRaw) : null;
+      const customIncreaseWon = customRatePctVal != null ? s.memberJeobun * (customRatePctVal / 100) : 0;
+      const customNewRate = customRatePctVal != null ? window.RateCalc.calcProportion({ C: s.C, A: xlA1Won + customIncreaseWon, B: xlB1Won }) : null;
+      const customPerMemberDelta = (customRatePctVal != null && s.memberCount) ? -customIncreaseWon / s.memberCount : null;
+
+      const customRateResultRow = R.writeField('인상률 적용 시 변경 후 비례율', 0, 'auto', '0.00%');
+      ws.getCell('L' + customRateResultRow).value = {
+        formula: 'IF(G' + customRateRow + '="","",(B' + a1Row + '+(' + customIncreaseExpr + ')-B' + b1Row + ')/B' + cRow + ')',
+        result: customNewRate != null ? customNewRate : '',
+      };
+      const customPerMemberRow = R.writeField('└ A안 대비 조합원 1인당 분담금 변화(만원)', 0, 'auto', '#,##0', { eok: true });
+      ws.getCell('L' + customPerMemberRow).value = {
+        formula: 'IF(G' + customRateRow + '="","",-(' + customIncreaseExpr + ')/B' + memberCountRow + ')',
+        result: customPerMemberDelta != null ? Math.round(customPerMemberDelta / 10000) : '',
+      };
+      refreshEokPreview('N', customPerMemberRow, customPerMemberDelta != null ? Math.round(customPerMemberDelta / 10000) : 0);
     }
 
     // ── R열: 상세 계산 내역 (웹 화면 "상세보기"와 동일한 A/B/C/X/Y/Z) ─────────────────────
@@ -1978,7 +2210,7 @@ button{cursor:pointer;}
     const perRow = R.writeField('조합원 1인당 평균(Z ÷ 조합원수, 만원)', 0, 'auto', '#,##0', { eok: true });
     ws.getCell('L' + perRow).value = { formula: 'L' + zRow + '/B' + memberCountRow, result: xl.perMember != null ? Math.round(xl.perMember / 10000) : 0 };
     refreshEokPreview('N', perRow, xl.perMember != null ? Math.round(xl.perMember / 10000) : 0);
-    R.writeSpacer();
+    // R열은 여기서 끝(뒤에 이어질 섹션이 없음) — 트레일링 빈 줄은 세로 공간만 차지하므로 생략한다.
 
     ws.getColumn(1).alignment = { vertical: 'middle', wrapText: true };
     ws.getColumn(6).alignment = { vertical: 'middle', wrapText: true };
