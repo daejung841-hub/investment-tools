@@ -2317,6 +2317,24 @@ const TWIN_MA_WINDOW = 12;
 // 후보 풀을 크게 줄이면서도(노이즈 감소) 커버리지 상실은 0.90과 동률이라
 // 가장 유리한 지점으로 판단해 0.92를 채택한다.
 const TWIN_CORR_THRESHOLD = 0.92;
+// 쌍둥이 후보 최소 겹침 개월수(2026-09-21 세션, 25→30로 상향). 실측: 무작위
+// (사전에 닮았다고 가정하지 않은) 단지 쌍 600개로 확인한 결과, 겹침 딱
+// 25개월(이평 후 유효 수익률 포인트 13개)만으로 corr>=0.92를 통과한 쌍의
+// 61.8%가 실제 전체 기간으로 다시 보면 corr<0.85로 떨어졌다 — 표본이 적어
+// "우연히" 통과한 경우가 다수였다는 뜻. 신축 단지가 자기 전체 역사(태어난
+// 이후 전부)를 겹침 구간으로 밀어넣어 이 최소선을 겨우 넘기는 패턴(예:
+// SK북한산시티-e편한세상금빛그랑메종5단지, 겹침 26개월=후자의 전체 역사)이
+// 실제 노출 후보의 다수(겹침<=30개월 curated 사례의 88.2%)를 차지했다.
+// 30/40/50개월 세 후보를 시뮬레이션한 결과(표본 80개 단지, 후보 풀 1,039개):
+//   25개월(기존): 후보 평균 23.08개/target, "후보 전무" 비율 8.0%
+//   30개월      : 후보 평균 20.99개(-9.1%), "후보 전무" 12.0%(+4.0%p)
+//   40개월      : 후보 평균 20.30개(-12.0%), "후보 전무" 17.3%(+9.3%p)
+//   50개월      : 후보 평균 20.21개(-12.4%, 40 대비 거의 정체), "후보 전무" 20.0%(+12.0%p)
+// 40→50 구간은 후보 풀 감소가 사실상 멈추는데 "후보 전무" 부작용만 계속
+// 커져 이득 대비 손해가 급격히 나빠진다. 30개월은 실제 문제 사례(겹침
+// 25~29개월)를 전부 걸러내면서도 부작용이 가장 작아 30을 채택한다.
+// 신축/기축 차등은 두지 않는다 — 단일 기준.
+const TWIN_MIN_OVERLAP_MONTHS = 30;
 // 디커플링 "최근 구간" — 매칭용 이평 기간(TWIN_MA_WINDOW)과는 별개 파라미터.
 // 실측 검증: 강서힐스테이트-우장산이편한세상(진행중 디커플링)은 1~6개월 창이
 // 전부 비슷한 결론(-9.8~-11.8%p)을 냈지만, 관악드림타운-영등포푸르지오(이미
@@ -2669,7 +2687,7 @@ function findTwinCandidates(comp){
   let result = { curated: [], rest: [], bestFairPriceCandidate: null };
   if (!rebuildMembers.has(comp.name)){
     const compYms = [...comp.rowMap.keys()].filter(ym => comp.rowMap.get(ym).saleMid!=null).sort((a,b)=>a-b);
-    const minOverlap = TWIN_MA_WINDOW + 13; // 이평 후 상관계수를 낼 최소 수익률 포인트(13개) 확보
+    const minOverlap = TWIN_MIN_OVERLAP_MONTHS;
     if (compYms.length >= minOverlap){
       const bench = getVirtualBenchmarkComplex('seoul');
       const compBenchDecoupling = computeFixedWindowGap(comp, bench, overlapYmsOf(comp.rowMap, bench.rowMap, compYms));
