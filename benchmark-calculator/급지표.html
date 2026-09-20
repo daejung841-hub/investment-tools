@@ -9,6 +9,7 @@
   :root{
     --bg:#f7f7f5; --card-bg:#fff; --border:#e2e2df; --text:#222; --muted:#888;
     --base-color:#2563eb; --compare-color:#f97316;
+    --badge-bg:#eef2ff; --badge-text:#3949ab;
   }
   body{ margin:0; font-family:'Noto Sans KR',sans-serif; background:var(--bg); color:var(--text); }
   .header{ padding:16px 20px 4px; }
@@ -17,15 +18,15 @@
   .tabs{ display:flex; gap:6px; padding:12px 20px; flex-wrap:wrap; border-bottom:1px solid var(--border); }
   .tab-btn{ padding:6px 14px; border-radius:16px; border:1px solid var(--border); background:var(--card-bg); cursor:pointer; font-size:13px; }
   .tab-btn.active{ background:var(--base-color); color:#fff; border-color:var(--base-color); }
-  .district-section{ padding:16px 20px; }
-  .district-section h2{ font-size:15px; margin:0 0 10px; }
-  .card-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px; margin-bottom:20px; }
-  .complex-card{ border:2px solid var(--border); border-radius:10px; padding:10px 12px; background:var(--card-bg); cursor:pointer; user-select:none; }
-  .complex-card .name{ font-weight:700; font-size:14px; margin-bottom:4px; }
-  .complex-card .meta{ font-size:12px; color:var(--muted); }
+  .complex-card{ border:1px solid var(--border); border-radius:6px; padding:4px 6px; background:var(--card-bg); cursor:pointer; user-select:none; margin-bottom:3px; }
+  .complex-card:last-child{ margin-bottom:0; }
+  .complex-card .name{ font-weight:700; font-size:11px; margin-bottom:2px; line-height:1.25; }
+  .complex-card .badges{ display:flex; gap:3px; flex-wrap:nowrap; }
+  .badge{ display:inline-block; padding:1px 5px; border-radius:8px; font-size:9px; background:var(--badge-bg); color:var(--badge-text); white-space:nowrap; }
+  .badge.badge-price{ background:var(--base-color); color:#fff; font-weight:700; }
   .complex-card.role-base{ border-color:var(--base-color); box-shadow:0 0 0 1px var(--base-color) inset; }
   .complex-card.role-compare{ border-color:var(--compare-color); box-shadow:0 0 0 1px var(--compare-color) inset; }
-  .complex-card .role-badge{ display:none; font-size:11px; font-weight:700; margin-top:4px; }
+  .complex-card .role-badge{ display:none; font-size:9px; font-weight:700; margin-top:2px; }
   .complex-card.role-base .role-badge{ display:block; color:var(--base-color); }
   .complex-card.role-compare .role-badge{ display:block; color:var(--compare-color); }
   .bottom-bar{ position:fixed; left:0; right:0; bottom:0; background:var(--card-bg); border-top:1px solid var(--border); padding:10px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -39,22 +40,41 @@
   .ctx-menu{ position:fixed; background:var(--card-bg); border:1px solid var(--border); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.15); padding:4px 0; z-index:100; }
   .ctx-menu button{ display:block; width:100%; padding:8px 16px; border:none; background:none; text-align:left; cursor:pointer; font-size:13px; }
   .ctx-menu button:hover{ background:var(--bg); }
-  .all-grid-wrap{ overflow:auto; max-height:calc(100vh - 200px); padding:0 20px 20px; }
-  .all-grid{ border-collapse:collapse; }
-  .all-grid th, .all-grid td{ border:1px solid var(--border); padding:6px; vertical-align:top; }
-  .all-grid thead th{ position:sticky; top:0; background:var(--bg); font-size:12px; white-space:nowrap; z-index:2; }
-  .all-grid tbody th{ position:sticky; left:0; background:var(--bg); font-size:12px; white-space:nowrap; text-align:right; padding-right:10px; z-index:1; }
-  .all-grid thead th:first-child{ position:sticky; left:0; z-index:3; }
-  .all-grid td{ min-width:150px; }
-  .all-grid .complex-card{ padding:6px 8px; margin-bottom:6px; }
-  .all-grid .complex-card:last-child{ margin-bottom:0; }
-  .all-grid .complex-card .name{ font-size:12px; margin-bottom:2px; }
-  .all-grid .complex-card .meta{ font-size:11px; }
+  .all-grid-wrap{ overflow:auto; max-height:calc(100vh - 200px); padding:0 20px 20px; background:var(--bg); }
+  /* border-collapse:collapse는 sticky 셀과 함께 쓰면 셀 사이 경계선이
+     스크롤 시 함께 이동하지 않아 그 틈으로 뒤쪽 콘텐츠가 비쳐 보이는
+     브라우저 렌더링 버그가 있다. border-collapse:separate + box-shadow
+     테두리로 바꿔 각 셀이 스스로 배경/테두리를 온전히 그리게 한다. */
+  .all-grid{ border-collapse:separate; border-spacing:0; }
+  .all-grid th, .all-grid td{ box-shadow:inset -1px -1px 0 0 var(--border); padding:2px 4px; vertical-align:top; }
+  .all-grid thead th{ position:sticky; top:0; background:var(--bg); font-size:11px; white-space:nowrap; z-index:2; }
+  .all-grid tbody th{ position:sticky; left:0; background:var(--bg); font-size:11px; white-space:nowrap; text-align:right; padding-right:8px; z-index:1; }
+  .all-grid thead th:first-child{ position:sticky; left:0; background:var(--bg); z-index:3; }
+  .all-grid tbody th.band-high{ color:var(--base-color); font-weight:700; }
+  /* 항목4(2026-09 세션) — 구/시 이름·카드 내용이 줄바꿈되면 행이
+     세로로 길어지므로, 줄바꿈 없이 한 줄에 들어가도록 컬럼 폭을
+     넉넉히 주고 가로 스크롤을 허용한다(세로로 늘어지는 것보다 낫다는
+     판단 — 사용자 확인). 이후(2026-09 세션 추가 요청) 172px는 여백이
+     과했다는 피드백으로, 전체 단지명(캔버스 measureText 실측)을 폭
+     후보별로 대조해 "80% 이상이 한 줄에 들어가는 가장 좁은 폭"을
+     찾았다 — 120px 76.6%, 123px 77.7%, 124px 80.6%로 124~125px가
+     임계값이라 125px로 정함(나머지 20%인 "e편한세상"류 긴 이름만
+     의도적으로 줄바꿈되도록 .name의 white-space:nowrap도 제거).
+     구/시 컬럼명(th)은 짧아서 영향 없어 그대로 nowrap 유지. */
+  .all-grid td{ min-width:125px; }
+  /* 서울→경기, 경기→인천 등 권역이 바뀌는 첫 컬럼에 구분선 표시
+     ("전체보기" 탭에서 경기/인천 시작 지점을 구분해달라는 요청). */
+  .all-grid th.region-start, .all-grid td.region-start{
+    box-shadow: inset 2px 0 0 0 var(--base-color), inset -1px -1px 0 0 var(--border);
+  }
+  .all-grid thead th:first-child.region-start{ box-shadow: inset -1px -1px 0 0 var(--border); }
+  .region-tag{ display:block; font-size:9px; color:var(--base-color); font-weight:700; margin-bottom:1px; }
 </style>
 
 <div class="header">
   <h1>급지표</h1>
-  <div class="criteria">분류 기준: 최신월 매매일반평균가 (고정 6구간)</div>
+  <div class="criteria">분류 기준: 최신월 매매일반평균가</div>
+  <div class="criteria" id="dataMonth"></div>
 </div>
 <div class="tabs" id="priceTabs"></div>
 <div id="bandContent"></div>
@@ -64,15 +84,170 @@
 <script src="seedComplexes.js"></script>
 <script>
 const ALL = window.SEED_COMPLEXES || [];
-let bands = [];
-let activeTab = 'seoul-all'; // 'seoul-all' | 'gyeonggi-all' | bands 배열 인덱스(0~5)
 
-const SEOUL_DISTRICTS = [
-  '강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구',
-  '동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구',
-  '용산구','은평구','종로구','중구','중랑구'
-];
-function isSeoulDistrict(d){ return d && SEOUL_DISTRICTS.includes(d); }
+// 항목2(2026-09 세션) — 컬럼(구/시) 노출 순서를 사용자가 지정한 순서로
+// 하드코딩한다. seedComplexes.js의 district는 "구" 단위(또는 그
+// 이하 KB 자체 생활권 코드)라 사용자가 준 "시" 단위 경기 리스트와
+// 바로 맞지 않는다 — build_seed_complexes.py에 추가한 regionCity
+// 필드(서울/인천은 "서울"/"인천", 경기는 실제 시·군명)로 상위 권역을
+// 판별하고, 같은 시 안에 여러 구가 있으면(예: 성남시=분당/수정/중원)
+// 그 시 위치에 구들을 가나다순으로 묶어서 배치한다(사용자가 시 산하
+// 구 순서까지는 지정하지 않아 가나다순을 기본값으로 정함).
+const SEOUL_ORDER = ['강남구','서초구','용산구','송파구','성동구','마포구','광진구','양천구','동작구','강동구','영등포구','중구','성북구','서대문구','동대문구','종로구','강서구','은평구','노원구','관악구','구로구','중랑구','강북구','금천구','도봉구'];
+// 사용자가 준 27개 시 순서 그대로 + 데이터에 실존하지만 리스트에
+// 없던 "포천시"(2개 단지 확인됨)를 맨 뒤에 추가했다(사용자 확인 완료).
+// "이천시"·"여주시"는 현재 데이터에 해당 단지가 없어 컬럼이 자동으로
+// 생략된다(문제 아님 — 나중에 데이터가 들어오면 그 자리에 자동 노출).
+const GG_CITY_ORDER = ['과천시','성남시','광명시','안양시','수원시','구리시','의왕시','용인시','하남시','군포시','고양시','부천시','안산시','화성시','남양주시','의정부시','시흥시','김포시','오산시','광주시','파주시','양주시','평택시','이천시','동두천시','안성시','여주시','포천시'];
+// 사용자가 준 인천 리스트 그대로. "중구"·"동구"·"제물포구"는 현재
+// 데이터에 없어 자동 생략된다. "서구"는 KB 원자료 자체가 "서해구"로
+// 표기해 실제 district 값이 "서해구"인데, DISTRICT_DISPLAY_FIX로
+// 화면 표시만 "서구"로 교정한다(district 원본 값은 그대로 둠).
+const IC_ORDER = ['연수구','부평구','서구','남동구','계양구','중구','미추홀구','강화군','동구','제물포구','영종구','검단구'];
+const DISTRICT_DISPLAY_FIX = { '서해구':'서구' };
+
+// build_seed_complexes.py의 extract_district는 정규식으로 "OO구"를
+// 통째로 추출하는데, "김포신곡6지구"·"영신지구"·"향산지구"처럼 택지
+// 지구명이 우연히 "구"로 끝나 오탐되는 경우가 있다(2026-09 세션 실측
+// 3건 — 고촌센트럴자이/평택지제역자이/힐스테이트리버시티1단지). 실제
+// 존재하는 구/군만 화이트리스트로 인정하고, 그 외는 무효 처리해 해당
+// 시(regionCity)의 "구 없음" 컬럼으로 되돌린다.
+const VALID_DISTRICT = new Set([
+  ...SEOUL_ORDER,
+  '분당구','수정구','중원구', '동안구','만안구', '영통구','권선구','장안구','팔달구',
+  '기흥구','수지구','처인구', '단원구','상록구', '일산동구','일산서구','덕양구',
+  '소사구','원미구', '동탄구','병점구','만세구','효행구',
+  '연수구','부평구','서해구','남동구','계양구','중구','미추홀구','강화군','영종구','검단구','제물포구'
+]);
+function validDistrict(c){ return (c.district && VALID_DISTRICT.has(c.district)) ? c.district : null; }
+
+function regionOfComplex(c){
+  if (c.regionCity === '서울') return 'seoul';
+  if (c.regionCity === '인천') return 'incheon';
+  if (c.regionCity) return 'gyeonggi';
+  return 'unclassified';
+}
+
+function districtDisplayName(d){ return DISTRICT_DISPLAY_FIX[d] || d; }
+
+// 컬럼을 구분하는 고유 key. 서울/인천은 구 이름이 곧 key, 경기는
+// "시명::구명"(구가 없으면 "시명::시명")으로 접두를 둬 다른 권역의
+// 동명 구(예: 서울 중구/인천 중구)와 절대 섞이지 않게 한다.
+function colKeyOfComplex(c){
+  const region = regionOfComplex(c);
+  const d = validDistrict(c);
+  if (region === 'seoul') return d || '미분류';
+  if (region === 'incheon') return 'IC::' + districtDisplayName(d || '미분류');
+  if (region === 'gyeonggi') return c.regionCity + '::' + (d ? districtDisplayName(d) : c.regionCity);
+  return '미분류';
+}
+
+function buildColumns(complexes){
+  const bySeoul = new Map(); // key -> true
+  const byGG = new Map(); // city -> Set(colLabel)
+  const byIC = new Map(); // colLabel -> true
+  let hasUnclassified = false;
+
+  complexes.forEach(c => {
+    const region = regionOfComplex(c);
+    const d = validDistrict(c);
+    if (region === 'seoul'){
+      bySeoul.set(d || '미분류', true);
+    } else if (region === 'incheon'){
+      byIC.set(districtDisplayName(d || '미분류'), true);
+    } else if (region === 'gyeonggi'){
+      const label = d ? districtDisplayName(d) : c.regionCity;
+      if (!byGG.has(c.regionCity)) byGG.set(c.regionCity, new Set());
+      byGG.get(c.regionCity).add(label);
+    } else {
+      hasUnclassified = true;
+    }
+  });
+
+  const cols = [];
+
+  SEOUL_ORDER.forEach(d => { if (bySeoul.has(d)) cols.push({ key: d, label: d, region: 'seoul' }); });
+  [...bySeoul.keys()].filter(d => !SEOUL_ORDER.includes(d)).sort((a,b)=>a.localeCompare(b,'ko'))
+    .forEach(d => cols.push({ key: d, label: d, region: 'seoul' }));
+
+  let ggFirst = true;
+  function pushGGCity(city){
+    const labels = byGG.get(city);
+    if (!labels || !labels.size) return;
+    const sorted = [...labels].sort((a,b) => {
+      if (a === city) return -1; // 구 없이 시 자체가 컬럼인 경우 먼저
+      if (b === city) return 1;
+      return a.localeCompare(b, 'ko');
+    });
+    sorted.forEach((label, i) => {
+      cols.push({ key: city+'::'+label, label: (label===city ? city : city+'·'+label), region: 'gyeonggi', regionStart: ggFirst && i===0 });
+      ggFirst = false;
+    });
+  }
+  GG_CITY_ORDER.forEach(pushGGCity);
+  [...byGG.keys()].filter(city => !GG_CITY_ORDER.includes(city)).sort((a,b)=>a.localeCompare(b,'ko')).forEach(pushGGCity);
+
+  let icFirst = true;
+  function pushIC(label){
+    if (!byIC.has(label)) return;
+    cols.push({ key: 'IC::'+label, label: label, region: 'incheon', regionStart: icFirst });
+    icFirst = false;
+  }
+  IC_ORDER.forEach(d => pushIC(districtDisplayName(d)));
+  [...byIC.keys()].filter(l => !IC_ORDER.map(districtDisplayName).includes(l)).sort((a,b)=>a.localeCompare(b,'ko')).forEach(pushIC);
+
+  if (hasUnclassified) cols.push({ key: '미분류', label: '미분류', region: 'unclassified' });
+
+  if (cols.length && cols[0].region === 'seoul') cols[0].regionStart = true;
+
+  return cols;
+}
+
+const REGION_TAG_LABEL = { seoul: '서울', gyeonggi: '경기', incheon: '인천', unclassified: '미분류' };
+
+// 동명 단지 지역명 부기(2026-09 세션) — 벤치마크_배율_계산기.html의
+// disambiguateCommonComplexNames()와 실측 확인 결과 급지표는 그 스크립트를
+// 로드하지 않아(계산기 HTML에만 있는 인라인 IIFE) "현대"/"우성" 같은
+// 완전 동일 이름 단지가 지역 구분 없이 그대로 표시되고 있었다. 계산기는
+// window.SEED_COMPLEXES[].name 자체를 로드 직후 한 번 변형해 모든 표시
+// 지점에 자동 반영시키는 방식이지만, 급지표는 그 인라인 스크립트를 그대로
+// 옮기지 않고 원본 데이터는 그대로 둔 채 "이름을 그리는 지점"(cardHtml,
+// renderBottomBar)에서만 표시용 이름으로 바꿔 쓴다 — id로만 매칭하는
+// 급지표 로직(toggleCard/roleOf 등)이 원본 .name에 의존하지 않기도 하고,
+// 데이터 자체를 건드리지 않는 편이 더 안전하다는 판단.
+// 판단 기준은 계산기와 동일: 이름이 완전히 같은 단지가 2개 이상이고,
+// 그중 district(유효한 구/군만 — validDistrict)가 서로 다른 경우만
+// "이름(구)" 형태로 표기한다(district가 없거나 유효하지 않은 단지는
+// 원래 이름 그대로 둔다 — 구분할 지역 정보가 없으므로).
+// "건영(3차)"처럼 원본 이름 끝에 이미 괄호가 있는 경우 단순히
+// "건영(3차)(관악)"처럼 괄호를 이어붙이면 어색해서(2026-09 세션, 8개
+// 대상 그룹 중 2개— 건영(3차)/현대(1차) — 가 해당), 그 괄호를 풀어
+// 본문에 합친 뒤("건영3차") 지역명 괄호를 새로 붙인다("건영3차(관악)").
+function mergeTrailingParen(name){
+  const m = name.match(/^(.*)\(([^()]+)\)$/);
+  return m ? (m[1] + m[2]) : name;
+}
+const DISPLAY_NAME_BY_ID = (function(){
+  const map = new Map();
+  const byName = new Map();
+  ALL.forEach(c => {
+    if (!c || !c.name) return;
+    if (!byName.has(c.name)) byName.set(c.name, []);
+    byName.get(c.name).push(c);
+  });
+  byName.forEach(group => {
+    if (group.length < 2) return;
+    const districts = new Set(group.map(c => validDistrict(c)).filter(Boolean));
+    if (districts.size < 2) return;
+    group.forEach(c => {
+      const d = validDistrict(c);
+      if (!d) return;
+      map.set(c.id, mergeTrailingParen(c.name) + '(' + d.replace(/구$/, '') + ')');
+    });
+  });
+  return map;
+})();
+function displayName(complex){ return DISPLAY_NAME_BY_ID.get(complex.id) || complex.name; }
 
 const MAX_TOTAL_SELECTED = 11; // 기준 1 + 비교 10 (계산기 MAX_SLOTS와 동일)
 let baseId = null;
@@ -130,11 +305,11 @@ function renderBottomBar(){
   const chips = [];
   if (baseId){
     const c = ALL.find(x=>x.id===baseId);
-    if (c) chips.push('<span class="chip base">기준: '+esc(c.name)+'</span>');
+    if (c) chips.push('<span class="chip base">기준: '+esc(displayName(c))+'</span>');
   }
   compareIds.forEach(id => {
     const c = ALL.find(x=>x.id===id);
-    if (c) chips.push('<span class="chip compare">'+esc(c.name)+'</span>');
+    if (c) chips.push('<span class="chip compare">'+esc(displayName(c))+'</span>');
   });
   bar.innerHTML = (chips.length ? chips.join('') : '<span class="empty">단지를 클릭해 선택하세요</span>') +
     '<button id="compareBtn"'+(baseId ? '' : ' disabled')+'>시세비교</button>';
@@ -151,53 +326,48 @@ function goToCalculator(){
 
 function esc(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
+const TAB_CONFIG = {
+  all: { label: '전체보기', filter: () => true, showRegionLabel: true },
+  seoul: { label: '서울', filter: c => regionOfComplex(c)==='seoul', showRegionLabel: false },
+  gyeonggi: { label: '경기', filter: c => regionOfComplex(c)==='gyeonggi', showRegionLabel: false },
+  incheon: { label: '인천', filter: c => regionOfComplex(c)==='incheon', showRegionLabel: false }
+};
+const TAB_KEYS = ['all', 'seoul', 'gyeonggi', 'incheon'];
+let activeTab = 'all';
+
 function renderTabs(){
   const el = document.getElementById('priceTabs');
   el.innerHTML = '';
-  const seoulBtn = document.createElement('button');
-  seoulBtn.className = 'tab-btn' + (activeTab==='seoul-all' ? ' active' : '');
-  seoulBtn.textContent = '전체보기(서울)';
-  seoulBtn.addEventListener('click', () => { activeTab='seoul-all'; renderTabs(); renderBandContent(); });
-  el.appendChild(seoulBtn);
-  const gyeonggiBtn = document.createElement('button');
-  gyeonggiBtn.className = 'tab-btn' + (activeTab==='gyeonggi-all' ? ' active' : '');
-  gyeonggiBtn.textContent = '전체보기(경기·인천)';
-  gyeonggiBtn.addEventListener('click', () => { activeTab='gyeonggi-all'; renderTabs(); renderBandContent(); });
-  el.appendChild(gyeonggiBtn);
-  bands.forEach((band, i) => {
+  TAB_KEYS.forEach(key => {
     const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (activeTab===i ? ' active' : '');
-    btn.textContent = band.label + ' (' + band.ids.length + ')';
-    btn.addEventListener('click', () => { activeTab=i; renderTabs(); renderBandContent(); });
+    btn.className = 'tab-btn' + (activeTab===key ? ' active' : '');
+    btn.textContent = TAB_CONFIG[key].label;
+    btn.addEventListener('click', () => { activeTab=key; renderTabs(); renderBandContent(); });
     el.appendChild(btn);
   });
 }
 
-function groupByDistrict(ids){
-  const byDistrict = new Map();
-  const unclassified = [];
-  ids.forEach(id => {
-    const complex = ALL.find(c => c.id === id);
-    if (!complex) return;
-    if (complex.district){
-      if (!byDistrict.has(complex.district)) byDistrict.set(complex.district, []);
-      byDistrict.get(complex.district).push(complex);
-    } else {
-      unclassified.push(complex);
-    }
-  });
-  return { byDistrict, unclassified };
+// 항목5(2026-09 세션) — 참고 이미지 스타일대로 연식·세대수를 옅은
+// 배경의 작은 뱃지로 표시한다. shared.js의 ageLabel()은 계산기와
+// 공유하는 함수라(전체 문장을 반환) 건드리지 않고, 급지표 전용으로
+// 따로 계산한다. (2026-09 세션 추가 요청) "26년차"식 연차 표기는
+// seedComplexes.js의 builtYear를 그대로 "1999년"처럼 준공연도로
+// 바꿔 표시한다 — 계산 없이 원본 값 그대로.
+function ageBadgeText(builtYear){
+  if (builtYear == null) return '정보없음';
+  return builtYear + '년';
 }
 
-function cardHtml(complex){
-  const units = complex.units!=null ? complex.units+'세대' : '정보없음';
-  const age = window.SharedLib.ageLabel(complex.builtYear);
+function cardHtml(complex, priceLabel){
   const role = roleOf(complex.id);
   const roleClass = role ? ' role-'+role : '';
   const roleLabel = role === 'base' ? '기준단지' : role === 'compare' ? '비교단지' : '';
+  const ageBadge = '<span class="badge">'+esc(ageBadgeText(complex.builtYear))+'</span>';
+  const unitsBadge = '<span class="badge">'+esc(complex.units!=null ? complex.units+'세대' : '정보없음')+'</span>';
+  const priceBadge = priceLabel!=null ? '<span class="badge badge-price">'+priceLabel.toFixed(1)+'억</span>' : '';
   return '<div class="complex-card'+roleClass+'" data-id="'+esc(complex.id)+'">' +
-    '<div class="name">'+esc(complex.name)+'</div>' +
-    '<div class="meta">'+units+' · '+age+'</div>' +
+    '<div class="name">'+esc(displayName(complex))+'</div>' +
+    '<div class="badges">'+ageBadge+unitsBadge+priceBadge+'</div>' +
     '<div class="role-badge">'+esc(roleLabel)+'</div>' +
     '</div>';
 }
@@ -219,79 +389,137 @@ function priceInEok(complex){
   return Math.round(priceManwon / 1000) / 10; // 0.1억 단위 반올림
 }
 
-function renderPriceRowGrid(content, regionFilterFn){
-  const inRegion = ALL.filter(c => regionFilterFn(c.district));
+// 항목1(2026-09 세션) — 40억 이상은 통합 행, 30~40억은 3억 단위,
+// 30억 미만은 기존처럼 0.5억 단위로 묶는다. 30~40억 구간은 정확히
+// 40억에서 끝나야 해서 마지막 구간(39~40억)만 폭이 1억으로 잘린다
+// (사용자 예시와 일치하는 의도된 동작).
+const HIGH_PRICE_THRESHOLD = 40; // 억
+const MID_BAND_START = 30; // 억 — 이 이상 HIGH_PRICE_THRESHOLD 미만은 3억 단위
+const MID_BIN_WIDTH = 3;
+const LOW_BIN_WIDTH = 0.5; // 억 — MID_BAND_START 미만 구간 폭
+
+function binLowFor(price){
+  if (price >= MID_BAND_START){
+    return MID_BAND_START + Math.floor((price - MID_BAND_START) / MID_BIN_WIDTH) * MID_BIN_WIDTH;
+  }
+  const tenths = Math.round(price * 10);
+  return Math.floor(tenths / (LOW_BIN_WIDTH * 10)) * LOW_BIN_WIDTH;
+}
+function binHighFor(binLow){
+  if (binLow >= MID_BAND_START) return Math.min(binLow + MID_BIN_WIDTH, HIGH_PRICE_THRESHOLD);
+  return binLow + LOW_BIN_WIDTH;
+}
+function fmtBin(binLow, binHigh){
+  return binLow.toFixed(1) + '~' + binHigh.toFixed(1) + '억';
+}
+
+function sortByPriceDesc(a, b){
+  return b.price - a.price || a.complex.name.localeCompare(b.complex.name, 'ko');
+}
+
+function entriesInCol(list, col){
+  return list.filter(p => colKeyOfComplex(p.complex) === col.key).sort(sortByPriceDesc);
+}
+
+function renderPriceRowGrid(content, regionFilterFn, showRegionLabel){
+  const inRegion = ALL.filter(regionFilterFn);
   const priced = inRegion
     .map(c => ({ complex: c, price: priceInEok(c) }))
     .filter(p => p.price != null);
 
-  const districts = [...new Set(inRegion.filter(c=>c.district).map(c=>c.district))]
-    .sort((a,b)=>a.localeCompare(b,'ko'));
-  const hasUnclassified = inRegion.some(c=>!c.district);
-  const cols = hasUnclassified ? [...districts, '구 미분류'] : districts;
-
-  if (!cols.length || !priced.length){
-    content.innerHTML = '<div class="district-section"><div style="color:var(--muted);font-size:13px;">해당 지역에 단지가 없습니다.</div></div>';
+  if (!priced.length){
+    content.innerHTML = '<div class="district-section"><div style="color:var(--muted);font-size:13px;padding:16px 20px;">해당 지역에 단지가 없습니다.</div></div>';
     return;
   }
 
-  const priceValues = [...new Set(priced.map(p=>p.price))].sort((a,b)=>b-a);
+  const cols = buildColumns(priced.map(p => p.complex));
+  if (!cols.length){
+    content.innerHTML = '<div class="district-section"><div style="color:var(--muted);font-size:13px;padding:16px 20px;">해당 지역에 단지가 없습니다.</div></div>';
+    return;
+  }
+
+  const high = priced.filter(p => p.price >= HIGH_PRICE_THRESHOLD).sort(sortByPriceDesc);
+  const normal = priced.filter(p => p.price < HIGH_PRICE_THRESHOLD);
+
+  const binMap = new Map(); // binLow -> [{complex, price}]
+  normal.forEach(p => {
+    const binLow = binLowFor(p.price);
+    if (!binMap.has(binLow)) binMap.set(binLow, []);
+    binMap.get(binLow).push(p);
+  });
+  const bins = [...binMap.keys()].sort((a, b) => b - a);
 
   let html = '<div class="all-grid-wrap"><table class="all-grid"><thead><tr><th>시세(억 기준)</th>';
-  cols.forEach(d => { html += '<th>'+esc(d)+'</th>'; });
+  cols.forEach(col => {
+    const cls = col.regionStart ? ' class="region-start"' : '';
+    const tag = (showRegionLabel && col.regionStart) ? '<span class="region-tag">'+esc(REGION_TAG_LABEL[col.region])+'</span>' : '';
+    html += '<th'+cls+'>'+tag+esc(col.label)+'</th>';
+  });
   html += '</tr></thead><tbody>';
-  priceValues.forEach(price => {
-    html += '<tr><th>'+price.toFixed(1)+'억</th>';
-    cols.forEach(d => {
-      const entries = priced
-        .filter(p => p.price===price && (d==='구 미분류' ? !p.complex.district : p.complex.district===d))
-        .map(p => p.complex);
-      html += '<td>'+entries.map(cardHtml).join('')+'</td>';
+
+  if (high.length){
+    html += '<tr><th class="band-high">'+HIGH_PRICE_THRESHOLD+'억 이상</th>';
+    cols.forEach(col => {
+      const entries = entriesInCol(high, col);
+      const cls = col.regionStart ? ' class="region-start"' : '';
+      html += '<td'+cls+'>'+entries.map(p => cardHtml(p.complex, p.price)).join('')+'</td>';
+    });
+    html += '</tr>';
+  }
+
+  bins.forEach(binLow => {
+    const binHigh = binHighFor(binLow);
+    const list = binMap.get(binLow);
+    html += '<tr><th>'+fmtBin(binLow, binHigh)+'</th>';
+    cols.forEach(col => {
+      const entries = entriesInCol(list, col);
+      const cls = col.regionStart ? ' class="region-start"' : '';
+      html += '<td'+cls+'>'+entries.map(p => cardHtml(p.complex)).join('')+'</td>';
     });
     html += '</tr>';
   });
+
   html += '</tbody></table></div>';
   content.innerHTML = html;
 }
 
+let didInitialScroll = false; // '전체보기' 최초 진입 시 1회만 기준 단지로 스크롤
+
+function scrollToAnchorComplex(){
+  if (didInitialScroll) return;
+  didInitialScroll = true;
+  const anchor = ALL.find(c => c.name === '잠실엘스');
+  if (!anchor) return;
+  const card = document.querySelector('.complex-card[data-id="'+CSS.escape(anchor.id)+'"]');
+  const wrap = document.querySelector('.all-grid-wrap');
+  if (!card || !wrap) return;
+  // scrollIntoView({block:'center'})는 sticky thead가 차지하는 영역까지
+  // "보이는 영역"으로 계산해 카드가 중앙보다 위쪽에 걸리므로, wrap 기준
+  // 실제 픽셀 위치를 직접 계산해 중앙에 맞춘다.
+  const cardRect = card.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const cardOffsetInWrap = (cardRect.top - wrapRect.top) + wrap.scrollTop;
+  wrap.scrollTop = cardOffsetInWrap - (wrap.clientHeight / 2) + (cardRect.height / 2);
+}
+
 function renderBandContent(){
   const content = document.getElementById('bandContent');
-  const isRegionTab = activeTab === 'seoul-all' || activeTab === 'gyeonggi-all';
-  const prevWrap = isRegionTab ? content.querySelector('.all-grid-wrap') : null;
+  const prevWrap = content.querySelector('.all-grid-wrap');
   const savedScrollLeft = prevWrap ? prevWrap.scrollLeft : 0;
   const savedScrollTop = prevWrap ? prevWrap.scrollTop : 0;
   content.innerHTML = '';
-  if (!bands.length) return;
-  if (isRegionTab){
-    const regionFilterFn = activeTab === 'seoul-all'
-      ? (d) => isSeoulDistrict(d)
-      : (d) => !isSeoulDistrict(d);
-    renderPriceRowGrid(content, regionFilterFn);
-    const newWrap = content.querySelector('.all-grid-wrap');
-    if (newWrap) { newWrap.scrollLeft = savedScrollLeft; newWrap.scrollTop = savedScrollTop; }
-    wireCardEvents(content);
-    return;
-  }
-  const { byDistrict, unclassified } = groupByDistrict(bands[activeTab].ids);
-  const districts = [...byDistrict.keys()].sort();
-  districts.forEach(district => {
-    const section = document.createElement('div');
-    section.className = 'district-section';
-    section.innerHTML = '<h2>'+esc(district)+'</h2><div class="card-grid">'+
-      byDistrict.get(district).map(cardHtml).join('') + '</div>';
-    content.appendChild(section);
-  });
-  if (unclassified.length){
-    const section = document.createElement('div');
-    section.className = 'district-section';
-    section.innerHTML = '<h2>구 미분류</h2><div class="card-grid">'+
-      unclassified.map(cardHtml).join('') + '</div>';
-    content.appendChild(section);
-  }
-  if (!byDistrict.size && !unclassified.length){
-    content.innerHTML = '<div class="district-section"><div style="color:var(--muted);font-size:13px;">해당 구간에 단지가 없습니다.</div></div>';
-  }
+
+  const cfg = TAB_CONFIG[activeTab];
+  renderPriceRowGrid(content, cfg.filter, cfg.showRegionLabel);
+  const newWrap = content.querySelector('.all-grid-wrap');
+  if (newWrap) { newWrap.scrollLeft = savedScrollLeft; newWrap.scrollTop = savedScrollTop; }
   wireCardEvents(content);
+  if (activeTab === 'all'){
+    // 페이지 최초 로드 시 100vh 기반 max-height(.all-grid-wrap)가 첫 렌더
+    // 프레임에는 아직 최종값으로 반영되지 않을 수 있어, 두 프레임 뒤로
+    // 미뤄서 실제 레이아웃(및 뷰포트 크기)이 확정된 뒤에 중앙 위치를 계산한다.
+    requestAnimationFrame(() => requestAnimationFrame(scrollToAnchorComplex));
+  }
 }
 
 function showContextMenu(x, y, id){
@@ -316,8 +544,25 @@ function closeContextMenu(){
 
 function showFatalError(message){
   const content = document.getElementById('bandContent');
-  content.innerHTML = '<div class="district-section"><div style="color:#c0392b;font-size:13px;line-height:1.6;">'+
+  content.innerHTML = '<div class="district-section"><div style="color:#c0392b;font-size:13px;line-height:1.6;padding:16px 20px;">'+
     esc(message)+'</div></div>';
+}
+
+function renderDataMonth(){
+  // 단지별 CSV 원자료(시세기준월)에서 최신 연월을 직접 계산 — seedComplexes.js에
+  // 별도의 "기준월" 필드가 없어서 매번 스캔하지만, 1200개 규모에서도 비용이 미미하다.
+  let latestYm = null;
+  ALL.forEach(c => {
+    const rows = window.SharedLib.parseComplexCsv(c.text);
+    if (!rows.length) return;
+    const last = rows[rows.length - 1].ym;
+    if (latestYm == null || last > latestYm) latestYm = last;
+  });
+  const el = document.getElementById('dataMonth');
+  if (!el) return;
+  if (latestYm == null){ el.textContent = ''; return; }
+  const y = Math.floor(latestYm / 100), m = latestYm % 100;
+  el.textContent = '기준월: ' + y + '년 ' + m + '월';
 }
 
 function init(){
@@ -332,7 +577,7 @@ function init(){
       console.error('급지표: window.SEED_COMPLEXES가 비어 있거나 없습니다. <script src="seedComplexes.js"> 로드에 실패했을 수 있습니다.');
       return;
     }
-    bands = window.SharedLib.computePriceBands(ALL);
+    renderDataMonth();
     renderTabs();
     renderBandContent();
     renderBottomBar();
