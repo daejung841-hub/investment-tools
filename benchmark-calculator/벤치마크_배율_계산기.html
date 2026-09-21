@@ -377,6 +377,13 @@ textarea{
 .badge.warn{background:var(--warn-bg);color:var(--warn);}
 .badge.neutral{background:var(--neutral-bg);color:var(--ink-muted);}
 .fair-price-summary-card{border-radius:12px;padding:14px 16px;margin:10px 0;display:flex;flex-direction:column;gap:8px;}
+/* 항목(2026-09 세션, "저평가/고평가 요약 강조") — 진단 카드(.card) 안에
+   재사용할 때는 카드 자체의 flex gap(11px)이 이미 있어, 원래 쓰던
+   margin:10px 0(단독 배치용, #baseFairSummary·단일진단 헤드처럼 .card
+   바깥에서 쓰는 경우)을 그대로 두면 위아래 간격이 11+10=21px로 두 배 가까이
+   벌어진다(실측 확인). .card 안에서만 margin을 지워 카드 gap 하나로
+   통일한다 — 원래 단독 사용처는 이 선택자에 안 걸려 그대로 유지된다. */
+.card .fair-price-summary-card{margin:0;}
 .fair-price-summary-card.tone-good{background:var(--good-bg);}
 .fair-price-summary-card.tone-bad{background:var(--bad-bg);}
 .fair-price-summary-card.tone-warn{background:var(--warn-bg);}
@@ -632,6 +639,13 @@ textarea{
    실제 값 범위(예: +400%~-100%)와 무관하게 컨테이너/캔버스 크기로만
    정해지는 값이라 항상 동일하게 유지된다. */
 .twin-chart-wrap{height:385px;position:relative;}
+/* 단일진단 핵심의 "닮은꼴 1위" 미리보기(2026-09 세션, 시안 B) — 흥미유발용
+   요소라 풀 카드보다 낮은 높이로 가볍게 보여준다. 클릭/키보드로 심화분석을
+   여는 상호작용 요소라 role="button"에 맞춰 hover/focus 표시를 준다. */
+.twin-preview{cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:8px 10px 4px;}
+.twin-preview:hover, .twin-preview:focus-visible{border-color:var(--info);outline:none;}
+.twin-preview .twin-chart-wrap{height:180px;}
+.twin-preview-caption{font-size:12.5px;color:var(--ink-muted);text-align:center;margin-top:2px;}
 /* 항목(2026-09-19 세션, 여러 라운드에 걸쳐 다듬음) — Chart.js 데이터포인트
    툴팁을 커스텀 렌더링(external 콜백)으로 대체한 박스. 처음엔 차트 밖
    완전히 별도 위치로 뺐다가, 그래프와 너무 떨어져 보인다는 피드백으로
@@ -3514,7 +3528,7 @@ function fairPriceInterpretation(twinName, fair, curSalePrice){
   const diffPct = curSalePrice!=null ? (fair.fairPrice - curSalePrice) / curSalePrice * 100 : null;
   return ' '+withParticle(twinName, '과', '와')+'의 역사적 관계가 맞다면, 이 단지의 적정가는 약 '+fmtEok(fair.fairPrice)+' 수준으로 추정됩니다'+(diffPct!=null ? ' (현재가 대비 '+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'% 차이)' : '')+'.';
 }
-function renderTwinBody(body, comp, r, key){
+function renderTwinBody(body, comp, r, key, excludeNames){
   const { curated: rawCurated, rest: rawRest, bestFairPriceCandidate } = findTwinCandidates(comp);
   // 항목(2026-09 세션, "갭메우기 이력 UI 숨김") — 계산 레이어(closed 분류,
   // gapStats, historicalGapEpisodes)는 findTwinCandidates 안에 그대로 두고,
@@ -3522,8 +3536,13 @@ function renderTwinBody(body, comp, r, key){
   // 예측 점선은 둘 다 matchType==='closed'에만 종속돼 있어(isBestFairPrice/
   // predictionMonthsOf 참고) 이 필터 하나로 자동으로 함께 꺼진다 — 재활성화가
   // 필요해지면 이 두 줄만 되돌리면 된다.
-  const curated = rawCurated.filter(t => t.matchType !== 'closed');
-  const rest = rawRest.filter(t => t.matchType !== 'closed');
+  // excludeNames(2026-09 세션, "단일진단 정보위계 재구성" 시안 B) — 핵심에
+  // 이미 미리보기로 보여준 "닮은꼴 1위"를 심화분석의 쌍둥이 단지 상세에서
+  // 또 보여주면 중복이라, 그 이름만 여기서 한 번 더 걸러낸다(다중비교
+  // 탭에서는 항상 undefined라 영향 없음).
+  const notExcluded = t => !excludeNames || !excludeNames.has(t.name);
+  const curated = rawCurated.filter(t => t.matchType !== 'closed' && notExcluded(t));
+  const rest = rawRest.filter(t => t.matchType !== 'closed' && notExcluded(t));
   if (!curated.length && !rest.length){
     body.innerHTML = '<div class="twin-msg">상관계수 '+TWIN_CORR_THRESHOLD.toFixed(2)+' 이상인 쌍둥이 단지를 찾지 못했습니다.</div>';
     return;
@@ -3702,17 +3721,17 @@ function renderTwinBody(body, comp, r, key){
     const itemModeBtn = body.querySelector('[data-item-mode-toggle="'+idx+'"]');
     if (itemModeBtn) itemModeBtn.addEventListener('click', () => {
       cardChartModeOverride.set(itemKey, iMode === 'index' ? 'price' : 'index');
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
     });
     const itemRangeBtn = body.querySelector('[data-item-range-toggle="'+idx+'"]');
     if (itemRangeBtn) itemRangeBtn.addEventListener('click', () => {
       cardRangeModeOverride.set(itemKey, iRangeMode === 'overlap' ? 'full' : 'overlap');
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
     });
     const itemBenchBtn = body.querySelector('[data-item-bench-toggle="'+idx+'"]');
     if (itemBenchBtn) itemBenchBtn.addEventListener('click', () => {
       cardBenchLineOverride.set(itemKey, !iShowBench);
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
     });
   });
   const modeBtn = body.querySelector('[data-chart-mode-toggle]');
@@ -3722,7 +3741,7 @@ function renderTwinBody(body, comp, r, key){
       // 전역 토글은 "일괄 전환"이라 개별로 바꿔둔 카드 오버라이드를 지운다 —
       // 이후 다시 개별로 바꾸면 그 카드만 새로 전역과 독립적으로 유지된다.
       clearOverridesForSection(cardChartModeOverride, key);
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
     });
   }
   const rangeModeBtn = body.querySelector('[data-range-mode-toggle]');
@@ -3730,7 +3749,7 @@ function renderTwinBody(body, comp, r, key){
     rangeModeBtn.addEventListener('click', () => {
       rangeModeState.set(key, rangeMode === 'overlap' ? 'full' : 'overlap');
       clearOverridesForSection(cardRangeModeOverride, key);
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
     });
   }
   const moreBtn = body.querySelector('[data-twin-more]');
@@ -3738,14 +3757,14 @@ function renderTwinBody(body, comp, r, key){
     moreBtn.addEventListener('click', () => {
       twinMoreOpen.add(key);
       twinPageState.set(key, 1);
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
     });
   }
   if (moreOpen && totalRestPages > 1){
     body.querySelectorAll('[data-twin-page]').forEach(btn => {
       btn.addEventListener('click', () => {
         twinPageState.set(key, Number(btn.dataset.twinPage));
-        renderTwinBody(body, comp, r, key);
+        renderTwinBody(body, comp, r, key, excludeNames);
       });
     });
   }
@@ -3765,7 +3784,7 @@ function runWhenElementVisible(el, fn){
   });
   obs.observe(document.body, { attributes:true, subtree:true, attributeFilter:['style','class','hidden'] });
 }
-function wireTwinToggle(container, comp, r){
+function wireTwinToggle(container, comp, r, excludeNames){
   const btn = container.querySelector('[data-twin-toggle]');
   if (!btn) return;
   const key = btn.dataset.twinToggle;
@@ -3783,7 +3802,7 @@ function wireTwinToggle(container, comp, r){
   function ensureRendered(){
     if (!body.dataset.rendered){
       body.dataset.rendered = '1';
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
     }
   }
   function openInline(){
@@ -3791,7 +3810,7 @@ function wireTwinToggle(container, comp, r){
     body.style.display = '';
     if (!body.dataset.rendered){
       body.dataset.rendered = '1';
-      runWhenElementVisible(body, () => renderTwinBody(body, comp, r, key));
+      runWhenElementVisible(body, () => renderTwinBody(body, comp, r, key, excludeNames));
     }
   }
   if (openTwinRows.has(key)){
@@ -3820,7 +3839,7 @@ function wireTwinToggle(container, comp, r){
     btn.classList.toggle('open', nowOpen);
     body.style.display = nowOpen ? '' : 'none';
     if (nowOpen && !body.dataset.rendered){
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, excludeNames);
       body.dataset.rendered = '1';
     }
   });
@@ -4697,7 +4716,7 @@ function buildRatioStatTooltips(frameLabel){
   };
 }
 
-function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, keyTag, inlineSyncCard, headBadgeHtml, baseCompareHtml, baseIsSameAsCompBench){
+function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, keyTag, inlineSyncCard, headBadgeHtml, baseCompareHtml, baseIsSameAsCompBench, twinPreviewHtml){
   // keyTag: openTwinRows/twinPageState/chartModeState 등 전역 Map/Set의 키 네임스페이스.
   // 생략 시 기존처럼 (wide?'t':'c')를 쓴다. "우리 단지 진단하기" 탭은 항상 i=0,
   // wide=false로 호출되어 다중비교 카드 0번과 키가 겹치므로 's'를 넘겨 분리한다
@@ -4873,9 +4892,13 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   const priceHighlightHtml = (activeR.curSalePrice!=null || activeR.fairSale!=null)
     ? '<div class="stat-row price-highlight"><span class="k">현재가 / 적정가</span><span class="v">'+fmtEok(activeR.curSalePrice)+' / '+fmtEok(activeR.fairSale)+'</span></div>'
     : '';
-  const statsHtml = priceHighlightHtml+
+  // 항목(2026-09 세션, "정보 위계 재구성" 시안 A/B) — 매매(핵심)와 전세(심화)를
+  // 분리한다. 예전엔 매매/전세 4줄이 한 문자열로 합쳐져 있어서 둘을 다른
+  // 노출 위치(핵심/심화분석)로 보내려면 이 지점에서 쪼개야 했다.
+  const saleStatsHtml = priceHighlightHtml+
     '<div class="stat-row"><span class="k">매매 배율 (현재 / 평균) '+ratioTips.saleRatio+'</span><span class="v">'+fmtPct(activeR.currentSaleRatio)+' / '+fmtPct(activeR.avgSaleRatio)+'</span></div>'+
-    '<div class="stat-row"><span class="k">매매 갭 '+ratioTips.saleGap+'</span><span class="v '+(activeR.saleGap>0?'down':(activeR.saleGap<0?'up':''))+'">'+fmtEok(activeR.saleGap)+fmtGapPct(activeR.saleGap, activeR.curSalePrice)+'</span></div>'+
+    '<div class="stat-row"><span class="k">매매 갭 '+ratioTips.saleGap+'</span><span class="v '+(activeR.saleGap>0?'down':(activeR.saleGap<0?'up':''))+'">'+fmtEok(activeR.saleGap)+fmtGapPct(activeR.saleGap, activeR.curSalePrice)+'</span></div>';
+  const jeonseStatsHtml =
     '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균) '+ratioTips.jeonseRatio+'</span><span class="v">'+fmtPct(activeR.currentJeonseRatio)+' / '+fmtPct(activeR.avgJeonseRatio)+'</span></div>'+
     '<div class="stat-row"><span class="k">전세 갭 '+ratioTips.jeonseGap+'</span><span class="v '+(activeR.jeonseGap>0?'down':(activeR.jeonseGap<0?'up':''))+'">'+fmtEok(activeR.jeonseGap)+fmtGapPct(activeR.jeonseGap, activeR.curJeonsePrice)+'</span></div>';
   const compRatioStats = computeSelfRatioStats(comp);
@@ -4883,7 +4906,15 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   const ratioSentence = compEligibility.eligible
     ? jeonseRatioContextSentence(activeR.diag.badge, compRatioStats, state.threshold) + (compEligibility.note ? ' '+compEligibility.note : '')
     : compEligibility.reason;
-  const msgHtml = '<div class="card-msg easy-summary">'+esc(unifiedSummary || headlineDiag.easyMessage||headlineDiag.message)+'</div>'+wrapDetail(activeR.diag.message+' '+ratioSentence);
+  // 항목(2026-09 세션, "저평가/고평가 요약 강조") — 이 한 줄 요약은 정보
+  // 위계 재구성 이후 다중비교 탭의 핵심(항상 노출) 영역에 남은 유일한
+  // 서술 문장이라, 기존에 #baseFairSummary/단일진단 헤드에 쓰던
+  // .fair-price-summary-card(배경색)+tone-good/bad/warn/neutral(색상 체계는
+  // 새로 안 만들고 그대로 재사용)을 여기에도 입힌다. 글자색까지 재현하려면
+  // 텍스트를 .fair-price-summary-body로 한 겹 더 감싸야 한다(그 클래스가
+  // 자기 자신에 직접 font-size:14.5px/weight:700을 걸어두고 있어 easy-summary
+  // 상속값을 덮어쓴다 — 의도된 결과, 기존 박스와 동일한 글자 크기로 맞춰짐).
+  const msgHtml = '<div class="card-msg easy-summary fair-price-summary-card tone-'+headlineDiag.tone+'"><div class="fair-price-summary-body">'+esc(unifiedSummary || headlineDiag.easyMessage||headlineDiag.message)+'</div></div>'+wrapDetail(activeR.diag.message+' '+ratioSentence);
   const twinKey = 'twin-'+kTag+'-'+i;
   // 실측 동조율 카드는 처음 렌더링될 때만 쌍둥이 단지 섹션을 기본 펼침하고
   // 기본 노출을 제한한다 — 이미 기본값을 적용한 적 있으면(twinDefaultOpened)
@@ -4926,41 +4957,38 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
         wrapDetail(fmtYm(hedge.earlyLowYm)+'~'+fmtYm(hedge.highYm)+', 실제 '+(hedge.realRise>=0?'+':'')+hedge.realRise.toFixed(1)+'% vs M2 '+(hedge.m2Growth>=0?'+':'')+hedge.m2Growth.toFixed(1)+'% ('+(hedge.gap>=0?'+':'')+hedge.gap.toFixed(1)+'%p)')+
       '</div>'
     : '';
-  // 배지 과다 문제 — 동조율·인플레이션 헤지(2단, 자주 안 보는 세부 근거)는
-  // 하나의 "더 보기" 토글 뒤로 묶는다. 매매/전세 배율·갭과 쉬운말 요약(1단,
-  // 핵심 판단)은 그대로 always-visible. 쌍둥이 단지는 이미 자기 토글이 있어
-  // 그대로 둔다(2026-09 세션, 화면 구조 정리 요청 반영). 선도단지 현재 위치
-  // (M2 대비 위치·전세가율 자기이탈)는 쌍둥이 단지보다 참고 우선순위가
-  // 낮다는 요청으로 쌍둥이 단지 다음, 별도의 "더 보기" 뒤로 옮겼다(2026-09
-  // 세션).
-  const benchStatusMoreHtml = benchStatusHtml ? wrapMoreSection('📎 선도단지 현재 위치 더 보기', benchStatusHtml) : '';
-  // 단일단지 진단 화면 전용(2026-09-18 세션, 항목 4) — 동조율·헤지(준거단지
-  // 포함)는 토글 뒤에 숨기지 않고 항상 보이는 별도 카드로 분리해 반환한다.
-  // 쌍둥이 단지·선도단지 현재 위치는 그대로 우측 패널 토글로 남긴다(다중비교
-  // 화면은 지금처럼 "더 보기" 토글 뒤로 묶는 기존 방식 그대로 — inlineSyncCard가
-  // false일 때만 아래 moreHtml 경로를 탄다).
+  // 항목(2026-09 세션, "정보 위계 재구성" 시안 A/B 확정) — 예전엔 "더 보기
+  // (동조율·헤지)"와 "선도단지 현재 위치 더 보기"가 각자 별도 토글이었는데,
+  // 하나로 묶어 "📎 심화분석 더보기" 진입점 하나만 남긴다. 동조율/헤지/
+  // 선도단지 현재 위치는 캔버스가 있어도(선도단지 현재 위치) 지연렌더링이
+  // runWhenSectionVisible의 closest('[data-detail-body]')로 가장 가까운
+  // 토글 본문을 찾는 방식이라, 이 본문들을 자기 wrapMoreSection 없이 그냥
+  // 바깥 심화분석 wrapMoreSection 안에 직접 넣기만 해도 그 바깥 토글을
+  // 기준으로 알아서 다시 연결된다(코드 변경 불필요, 2026-09 세션 실측 확인).
+  // 쌍둥이 단지만 예외 — wireTwinToggle은 자기 전용 버튼([data-twin-toggle])이
+  // 있어야만 렌더링 파이프라인이 동작해서, 이 버튼은 그대로 남기고 심화분석
+  // 안에 통째로 얹는다(요청하신 "그대로" 유지).
+  const advancedBody = jeonseStatsHtml + syncHtml + hedgeHtml + twinHtml + (benchStatusHtml||'');
   if (inlineSyncCard){
+    // 단일진단 탭(시안 B) — "한 줄 요약"은 헤드의 conclusion이 이미 맡고
+    // 있어 msgHtml(unifiedSummary)은 핵심에 다시 안 보여준다. 두 문장을
+    // 합치지 말고 각자 자리로 재배치하라는 요청에 따라, msgHtml은 내용
+    // 그대로 심화분석 안으로 옮긴다. syncCard는 더 이상 쓰지 않는다
+    // (동조율 상세가 상시노출에서 심화분석 안으로 이동했으므로) — 호출부
+    // (renderSingleDiag)에서 빈 값을 그대로 두면 된다.
     return {
-      main: headHtml+statsHtml+msgHtml+twinHtml+benchStatusMoreHtml,
-      syncCard: syncHtml+hedgeHtml,
+      main: headHtml+saleStatsHtml+(twinPreviewHtml||'')+wrapMoreSection('📎 심화분석 더보기', msgHtml+advancedBody, false),
+      syncCard: '',
     };
   }
-  // 배지 과다 문제 — 동조율·인플레이션 헤지(2단, 자주 안 보는 세부 근거)는
-  // 하나의 "더 보기" 토글 뒤로 묶는다. 매매/전세 배율·갭과 쉬운말 요약(1단,
-  // 핵심 판단)은 그대로 always-visible. 쌍둥이 단지는 이미 자기 토글이 있어
-  // 그대로 둔다(2026-09 세션, 화면 구조 정리 요청 반영). 선도단지 현재 위치
-  // (M2 대비 위치·전세가율 자기이탈)는 쌍둥이 단지보다 참고 우선순위가
-  // 낮다는 요청으로 쌍둥이 단지 다음, 별도의 "더 보기" 뒤로 옮겼다(2026-09
-  // 세션).
-  const moreHtml = wrapMoreSection('📎 더 보기 (동조율 · 인플레이션 헤지)', syncHtml+hedgeHtml, isRealSyncCase);
+  const advancedHtml = wrapMoreSection('📎 심화분석 더보기', advancedBody, false);
   if (wide){
     return '<div class="diag-wide">'+
-      '<div class="diag-wide-col">'+headHtml+statsHtml+'</div>'+
-      '<div class="diag-wide-col">'+msgHtml+moreHtml+twinHtml+benchStatusMoreHtml+'</div>'+
+      '<div class="diag-wide-col">'+headHtml+saleStatsHtml+'</div>'+
+      '<div class="diag-wide-col">'+msgHtml+advancedHtml+'</div>'+
     '</div>';
   }
-  return headHtml+statsHtml+msgHtml+
-    moreHtml+twinHtml+benchStatusMoreHtml;
+  return headHtml+saleStatsHtml+msgHtml+advancedHtml;
 }
 
 // ---- "우리 단지 진단하기" (단지 1개 진단) ----
@@ -5212,6 +5240,56 @@ function wireBenchStatusCharts(container, bench, target){
     }
   });
 }
+// 항목(2026-09 세션, "단일진단 정보위계 재구성" 시안 B) — 단일진단 탭 핵심에
+// 보여줄 "닮은꼴 1위" 미리보기를 고른다. 심화분석 쪽 쌍둥이 단지 상세
+// (renderTwinBody)와 완전히 같은 선정 기준(matchType==='similar', 상관계수
+// 내림차순 1위)을 그대로 재사용해 두 군데 숫자가 어긋나지 않게 한다.
+// 등급 텍스트/상관계수 숫자는 여기서 아예 안 만든다 — 그래프 자체로
+// "이렇게 똑같이 움직여요"를 보여주는 흥미유발용 요소라는 요청에 따른 것.
+function pickTwinPreview(comp){
+  const { curated, rest } = findTwinCandidates(comp);
+  const pool = curated.concat(rest).filter(t => t.matchType === 'similar');
+  if (!pool.length) return null;
+  return pool.slice().sort((a,b)=> b.corr-a.corr)[0];
+}
+function buildTwinPreviewHtml(twin){
+  if (!twin) return '';
+  return '<div class="twin-preview" data-twin-preview="1" role="button" tabindex="0">'+
+    '<div class="twin-chart-wrap"><canvas data-twin-preview-canvas="1"></canvas></div>'+
+    '<div class="twin-preview-caption">'+esc(twin.name)+'과 거의 똑같이 움직여요 · 더 보려면 탭하세요</div>'+
+  '</div>';
+}
+// 핵심의 미리보기 그래프는 단일진단 화면이 항상 펼쳐진 상태라(접힌 부모가
+// 없음) 다른 미니차트들과 달리 지연렌더링(runWhenElementVisible 등) 없이
+// DOM에 들어가자마자 바로 그린다. 클릭/키보드(enter) 시 심화분석과 그 안의
+// 쌍둥이 단지 섹션을 그대로 열어(이미 있는 토글을 클릭하는 것과 동일) 그
+// 자리로 스크롤한다 — 심화 쪽엔 이 후보를 다시 안 보여주므로(excludeNames)
+// "미리보기 → 더 자세히"로 자연스럽게 이어진다.
+function wireTwinPreview(card, comp, twin){
+  const wrap = card.querySelector('[data-twin-preview="1"]');
+  if (!wrap || !twin) return;
+  const canvas = wrap.querySelector('[data-twin-preview-canvas="1"]');
+  if (canvas){
+    new Chart(canvas, twinMiniChartConfig(comp, twin.complex, twin.name, twin.overlapYms, 'index', 0, null, null, null, twin.decoupling, false, null, 'overlap'));
+  }
+  function openDetail(){
+    const advancedBtn = card.querySelector('.more-section > .section-toggle');
+    // 패널 모드(넓은 화면)에서는 advancedBtn.click()이 심화분석 본문을
+    // #sidePanel로 옮긴다(openSectionInPanel) — 그 안에 있는 쌍둥이 단지
+    // 버튼도 같이 옮겨지므로, 옮겨지기 "전" card 안에서 미리 참조를 잡아둔다
+    // (엘리먼트 참조는 위치가 바뀌어도 그대로 유효하다). 패널 모드는 'open'이
+    // 아니라 'active-panel' 클래스를 쓰므로 두 클래스 모두 "이미 열림"으로
+    // 인정해 중복 클릭으로 도로 닫히는 것을 막는다(openSectionInPanel은
+    // 같은 버튼을 다시 누르면 패널을 닫는 토글 버튼이라서다).
+    const twinBtn = card.querySelector('[data-twin-toggle]');
+    const advancedAlreadyOpen = advancedBtn && (advancedBtn.classList.contains('open') || advancedBtn.classList.contains('active-panel'));
+    if (advancedBtn && !advancedAlreadyOpen) advancedBtn.click();
+    if (twinBtn && !twinBtn.classList.contains('open')) twinBtn.click();
+    (twinBtn || advancedBtn || wrap).scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+  wrap.addEventListener('click', openDetail);
+  wrap.addEventListener('keydown', (e) => { if (e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(); } });
+}
 function renderSingleDiag(name){
   const headEl = document.getElementById('singleDiagHead');
   const resultEl = document.getElementById('singleDiagResult');
@@ -5266,24 +5344,29 @@ function renderSingleDiag(name){
     '<div class="single-conclusion">'+esc(conclusion)+'</div>'+
     buildFairPriceSummaryCard(r);
   document.getElementById('singleAddCompareBtn').addEventListener('click', () => addCompareFromSingleDiag(name));
-  // 동조율·헤지(준거단지 포함)는 토글 없이 항상 보이는 별도 카드로 핵심
-  // 진단카드 옆/아래에 배치한다(2026-09-18 세션, 항목 4) — 쌍둥이 단지·
-  // 선도단지 현재 위치는 그대로 우측 패널 토글로 남긴다.
+  // 항목(2026-09 세션, "정보 위계 재구성" 시안 B 확정) — 동조율 상세를 더
+  // 이상 상시노출 별도 카드로 두지 않고 심화분석 진입점 안으로 옮기면서
+  // singleDiagSyncCard 자체가 필요 없어졌다. [hidden] 어트리뷰트는 .card
+  // 클래스의 display:flex 규칙에 밀려 무시되므로(실측 확인 — hidden을 줘도
+  // computedDisplay가 flex로 남아 빈 박스가 보임), 아예 그 카드를 만들지
+  // 않는다.
   resultEl.innerHTML =
     '<div class="single-diag-row">'+
       '<div class="card single-diag-card" id="singleDiagCard"></div>'+
-      '<div class="card single-diag-sync-card" id="singleDiagSyncCard"></div>'+
     '</div>';
   const card = document.getElementById('singleDiagCard');
-  const syncCardEl = document.getElementById('singleDiagSyncCard');
   // "우리 단지 진단하기" 탭은 base가 항상 target 자신의 진짜 선도단지라
   // r과 rVsOwnBench가 사실상 같은 값이다 — 토글을 강제로 비활성화한다
-  // (baseIsSameAsCompBench=true).
-  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true, undefined, seoulRefHtml, true);
+  // (baseIsSameAsCompBench=true). 핵심의 "닮은꼴 1위" 미리보기(twinPreview)는
+  // 심화분석 안 쌍둥이 단지 상세와 같은 선정 기준을 쓰되, 중복 노출을
+  // 피하려고 그 이름을 심화 쪽 렌더링에서 제외한다(excludeNames).
+  const twinPreview = pickTwinPreview(target);
+  const excludeFromDetail = twinPreview ? new Set([twinPreview.name]) : undefined;
+  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true, undefined, seoulRefHtml, true, buildTwinPreviewHtml(twinPreview));
   card.innerHTML = built.main;
-  syncCardEl.innerHTML = built.syncCard;
-  wireTwinToggle(card, target, r);
-  wireEstDetailToggle(syncCardEl, target, estimate);
+  wireTwinPreview(card, target, twinPreview);
+  wireTwinToggle(card, target, r, excludeFromDetail);
+  wireEstDetailToggle(card, target, estimate);
   wireBenchStatusCharts(card, bench, target);
   if (chartSectionEl) chartSectionEl.style.display = '';
   renderSingleActiveChart(bench, target);
