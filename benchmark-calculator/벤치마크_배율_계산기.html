@@ -2173,6 +2173,25 @@ function buildBaseCompareNote(baseName, syncVsBase){
     fmtYm(b.low.ym)+'~'+fmtYm(b.high.ym)+' 동안 '+withParticle(baseName, '은', '는')+' '+(b.rise>=0?'+':'')+b.rise.toFixed(1)+'%, 이 단지는 '+(c.rise>=0?'+':'')+c.rise.toFixed(1)+'% 상승했습니다(비율 '+syncVsBase.rate.toFixed(1)+'%).'+
   '</div>';
 }
+// 항목(2026-09-20 세션, "재건축 벤치마크 활용 아이디어" 검토) — "우리 단지
+// 진단하기" 탭에서 재건축 선도단지로 분류된 노후단지에게 서울 일반
+// 벤치마크 대비 수치를 참고용으로 추가한다. buildBaseCompareNote와 계산·
+// 렌더링 방식은 동일하되(등급/배지 절대 표시 안 함) 라벨만 이 용도에 맞게
+// 고정했다 — 반드시 등급 없이 raw 숫자만 보여줘야 한다: 재건축 20개 멤버는
+// 개별 사이클 상승률 표준편차가 36.5%p(평균-중앙값 괴리 12.8%p)로 서울
+// 25개(표준편차 23.9%p, 괴리 0.6%p)보다 훨씬 이질적이고, 무엇보다 재건축
+// 분류 노후단지들은 서울 일반표본보다 상승률 자체가 구조적으로 높아서
+// (멤버 상승률 중앙값 234% vs 서울 177%) 서울 등급 구간표(SYNC_TIER_BOUNDS)를
+// 여기 적용하면 재건축 명단 20개 중 17개가 최상위 구간("아주좋음")에 쏠려
+// 버려 변별력을 잃는다 — 그래서 등급 표시는 절대 하지 않는다.
+function buildSeoulRefNote(syncVsSeoul){
+  if (!syncVsSeoul) return '';
+  const b = syncVsSeoul.baseCycle, c = syncVsSeoul.compCycle;
+  return '<div class="base-compare-note">'+
+    '<span class="k">서울 일반 벤치마크 대비(참고)</span> '+
+    fmtYm(b.low.ym)+'~'+fmtYm(b.high.ym)+' 동안 서울 일반 선도단지는 '+(b.rise>=0?'+':'')+b.rise.toFixed(1)+'%, 이 단지는 '+(c.rise>=0?'+':'')+c.rise.toFixed(1)+'% 상승했습니다(비율 '+syncVsSeoul.rate.toFixed(1)+'%).'+
+  '</div>';
+}
 
 // ---- 준거단지 자동매칭 동조율 추정 (2013년 이전 데이터가 없어 실측 동조율을
 // 계산할 수 없는 준신축 전용) ----
@@ -2438,6 +2457,28 @@ const TWIN_SIMILAR_COUNT = 2; // 🎯 닮은꼴(상관계수 상위)
 // 기본 노출이 4개가 아니라 최대 6개(닮은꼴2+괴리2+갭메우기2)까지 늘어날 수
 // 있는데, 이는 의도된 것이다.
 const TWIN_GAP_COUNT = 2;
+// 항목(2026-09 세션, "쌍둥이 단지 등급 텍스트") — "닮은꼴" 카드 헤드라인의
+// 정확한 상관계수 숫자를 등급 문구로 대체한다. 기존 SYNC_ESTIMATE_CORR_TIERS
+// (0.92/0.88/0.85/0.83...)는 하한을 점점 낮춰가며 준거단지 후보를 채우는
+// 다른 용도의 구간이라 여기 재사용하지 않았다 — 쌍둥이 후보는 애초에
+// TWIN_CORR_THRESHOLD(0.92) 미만이면 후보 풀에 들지도 못해 전부 0.92
+// 이상이므로, 그 임계값들을 그대로 쓰면 대부분 한 등급에 몰린다. 대신
+// 실측 분포(표본 5,725건, 2026-09 세션)를 근거로 새로 나눴다 — 0.92~0.94가
+// 54.9%, 0.94~0.96이 33.1%, 0.96~0.98이 11.1%, 0.98+가 0.9%. "현재 괴리"
+// 카드는 이 등급 대상에서 제외한다 — 괴리 카드는 corr 상위가 아니라 괴리폭
+// 기준으로 뽑혀 상관계수 분포 자체가 낮은 쪽에 몰려 있어(median 0.931 vs
+// 닮은꼴 0.948), 같은 등급표를 적용하면 대부분 최하위 등급에 깔려 "괴리 중"
+// 이라는 카드의 핵심 메시지가 흐려진다.
+const TWIN_SIMILARITY_TIERS = [
+  { min: 0.98, label: '사실상 같은 단지 수준이에요' },
+  { min: 0.96, label: '아주 닮은 단지예요' },
+  { min: 0.94, label: '꽤 닮았어요' },
+  { min: 0.92, label: '닮은 편이에요' },
+];
+function twinSimilarityLabel(corr){
+  const tier = TWIN_SIMILARITY_TIERS.find(t => corr >= t.min);
+  return tier ? tier.label : TWIN_SIMILARITY_TIERS[TWIN_SIMILARITY_TIERS.length-1].label;
+}
 // E-3 "적정가 추정" 자격 기준 — 갭메우기 이력 중에서도 특히 신뢰할 만한
 // ("여러 번 반복 검증 + 지금도 진행중") 사례만 방향예측 대신 구체적인
 // 적정가 추정치를 보여준다(2026-09 세션).
@@ -3399,13 +3440,14 @@ const GAP_HISTORY_TAG_TOOLTIP = '이 단지가 서울 선도단지 대비 과거
 const SIMILAR_CORR_TAG_TOOLTIP = '겹치는 기간 동안 오르내리는 방향과 타이밍이 가장 비슷했던(상관계수 1위) 단지입니다. 다만 방향이 같아도 실제 상승/하락폭 크기까지 비슷하다는 뜻은 아닙니다.';
 const SIMILAR_AMP_TAG_TOOLTIP = '방향성 상관계수는 기준(0.92) 이상을 유지하면서, 겹치는 기간의 실제 상승/하락폭까지 가장 비슷했던 단지입니다. 예측 목적으로는 이쪽이 더 참고할 만할 수 있습니다.';
 // 처음 보는 사용자를 위한 카테고리 범례 — 쌍둥이 단지 목록 맨 위에 한 번만 표시.
+// 항목(2026-09 세션, "갭메우기 이력 UI 숨김") — 갭메우기 이력 카드 자체를
+// 렌더링에서 뺐으므로(renderTwinBody 참고) 범례에서도 해당 항목과 그걸
+// 전제로 한 안내 문장을 뺐다. 재활성화 시 이 두 줄만 되돌리면 된다.
 const TWIN_CATEGORY_LEGEND =
   '<div class="twin-legend">'+
     '<span>🎯 동조 1위 = 오르내리는 방향·타이밍이 가장 비슷했던 단지(상관계수 기준)</span>'+
     '<span>📈 상승폭 유사 1위 = 방향뿐 아니라 실제 상승/하락폭 크기까지 가장 비슷했던 단지</span>'+
     '<span>📊 현재 괴리 = 늘 비슷했는데 지금 유독 차이나는 단지</span>'+
-    '<span>🎯 갭메우기 이력 = 그 단지가 서울 선도단지 대비 과거에도 벌어졌다 정상화된 적 있음(기준단지와의 관계 아님)</span>'+
-    '<span>ℹ️ 이 분류는 "위쪽 준거단지"(동조율 추정에 쓰인 단지) 선정과는 다른 기준입니다 — 준거단지는 "우리 단지와 얼마나 닮았는지", 여기 갭메우기 이력은 "그 단지 자체가 선도단지 대비 벌어졌다 좁혀진 적 있는지"를 봅니다. 같은 단지가 두 곳에서 다르게(또는 같게) 보일 수 있습니다.</span>'+
   '</div>';
 // 진단요약 카드 "선도단지 기준 / 기준단지 기준" 토글 상태(2026-09 세션) —
 // key(frameKey = kTag+'-'+i) -> 'bench'|'base'. 카드별로 독립 관리해야
@@ -3473,21 +3515,39 @@ function fairPriceInterpretation(twinName, fair, curSalePrice){
   return ' '+withParticle(twinName, '과', '와')+'의 역사적 관계가 맞다면, 이 단지의 적정가는 약 '+fmtEok(fair.fairPrice)+' 수준으로 추정됩니다'+(diffPct!=null ? ' (현재가 대비 '+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'% 차이)' : '')+'.';
 }
 function renderTwinBody(body, comp, r, key){
-  const { curated, rest, bestFairPriceCandidate } = findTwinCandidates(comp);
+  const { curated: rawCurated, rest: rawRest, bestFairPriceCandidate } = findTwinCandidates(comp);
+  // 항목(2026-09 세션, "갭메우기 이력 UI 숨김") — 계산 레이어(closed 분류,
+  // gapStats, historicalGapEpisodes)는 findTwinCandidates 안에 그대로 두고,
+  // 렌더링 목록에서만 matchType==='closed'를 걸러낸다. E-3 적정가 추정과
+  // 예측 점선은 둘 다 matchType==='closed'에만 종속돼 있어(isBestFairPrice/
+  // predictionMonthsOf 참고) 이 필터 하나로 자동으로 함께 꺼진다 — 재활성화가
+  // 필요해지면 이 두 줄만 되돌리면 된다.
+  const curated = rawCurated.filter(t => t.matchType !== 'closed');
+  const rest = rawRest.filter(t => t.matchType !== 'closed');
   if (!curated.length && !rest.length){
     body.innerHTML = '<div class="twin-msg">상관계수 '+TWIN_CORR_THRESHOLD.toFixed(2)+' 이상인 쌍둥이 단지를 찾지 못했습니다.</div>';
     return;
   }
-  // 기본 노출은 curated(닮은꼴2+괴리2, 갭메우기 있으면 최대 2개 추가)만 —
-  // 페이지 번호 없이 그대로 보여준다. 그 이후(rest)는 "더보기"를 눌러야만
-  // 페이지네이션이 나타난다.
+  // 기본 노출은 curated(닮은꼴2+괴리2)만 — 페이지 번호 없이 그대로 보여준다.
+  // 그 이후(rest)는 "더보기"를 눌러야만 페이지네이션이 나타난다.
   // previewLimit이 있으면(실측 동조율 카드의 기본 노출, 2026-09 세션 항목 2)
-  // curated 중 상위 N개만 먼저 보여주고, 나머지 curated + rest를 한데 묶어
-  // "더보기" 뒤로 넘긴다 — curated는 이미 상관계수 내림차순 정렬이라 slice만
-  // 해도 "상위 N개"가 그대로 유지된다.
+  // curated 전체가 아니라 "닮은꼴 1 + 현재괴리 1"만 먼저 보여준다(2026-09
+  // 세션, "쌍둥이 단지 축소") — 예전엔 상관계수 순으로 상위 N개를 그냥
+  // slice했는데, curated가 닮은꼴/괴리를 섞어 정렬한 배열이라 어느 쪽이
+  // 몇 개 걸릴지 들쭉날쭉했다. 이제 타입별로 명시적으로 1개씩 뽑아, 나머지는
+  // 상관계수 내림차순을 유지한 채 오버플로로 보낸다.
   const previewLimit = twinPreviewLimit.get(key) || null;
-  const visibleCurated = previewLimit ? curated.slice(0, previewLimit) : curated;
-  const overflowCurated = previewLimit ? curated.slice(previewLimit) : [];
+  let visibleCurated, overflowCurated;
+  if (previewLimit){
+    const previewSimilar = curated.filter(t => t.matchType === 'similar').slice(0, 1);
+    const previewGap = curated.filter(t => t.matchType === 'gap').slice(0, 1);
+    visibleCurated = previewSimilar.concat(previewGap).sort((a,b)=> b.corr-a.corr);
+    const shownNames = new Set(visibleCurated.map(t=>t.name));
+    overflowCurated = curated.filter(t => !shownNames.has(t.name));
+  } else {
+    visibleCurated = curated;
+    overflowCurated = [];
+  }
   const restPool = overflowCurated.concat(rest);
   const moreOpen = twinMoreOpen.has(key);
   const totalRestPages = Math.ceil(restPool.length / TWIN_PAGE_SIZE);
@@ -3597,8 +3657,14 @@ function renderTwinBody(body, comp, r, key){
       '<button class="chart-mode-toggle" data-item-range-toggle="'+idx+'">'+(iRangeMode==='overlap'?'🗓️전체기간':'🔗겹침만')+'</button>'+
       (iMode==='price' ? '' : '<button class="chart-mode-toggle" data-item-bench-toggle="'+idx+'">'+(iShowBench?'🏙️선도단지 끄기':'🏙️선도단지 보기')+'</button>')+
     '</div>';
+    // 항목(2026-09 세션, "쌍둥이 단지 등급 텍스트") — "닮은꼴" 카드만 정확한
+    // 상관계수 숫자를 등급 문구로 바꾼다. "현재 괴리" 카드는 괴리폭이
+    // 핵심 메시지라 기존처럼 숫자를 그대로 둔다(twinSimilarityLabel 옆
+    // 주석 참고). 상세보기(twinInterpretationText)는 매치타입과 무관하게
+    // 항상 정확한 숫자를 유지한다.
+    const corrDisplay = t.matchType === 'similar' ? twinSimilarityLabel(t.corr) : '상관계수 '+t.corr.toFixed(2);
     return sectionDividerHtml + '<div class="twin-card">'+
-      '<div class="twin-card-head">'+matchTypeTag(t)+' '+ongoingBadge(t)+' '+esc(t.name)+' <span class="cell-ratio">(상관계수 '+t.corr.toFixed(2)+', 겹치는 구간 '+t.overlapMonths+'개월)</span></div>'+
+      '<div class="twin-card-head">'+matchTypeTag(t)+' '+ongoingBadge(t)+' '+esc(t.name)+' <span class="cell-ratio">('+corrDisplay+', 겹치는 구간 '+t.overlapMonths+'개월)</span></div>'+
       itemToggleRowHtml+
       '<div class="twin-chart-note">'+(iMode==='price'?'실제 가격(억원) · 같은 축 공유':'양쪽 모두 시작 시점 대비 상승률(%) · 그래프의 지점을 클릭하면 그 지점을 새 기준점으로 다시 계산합니다')+(iRangeMode==='full' ? '' : decoupleNoteHtml+(hasDrawableEpisodes?' · 파란 음영=과거 완결된 갭메우기 에피소드':''))+benchLineNoteHtml+rangeNoteHtml+'</div>'+
       predictionNoteHtml+
@@ -4820,13 +4886,18 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   const msgHtml = '<div class="card-msg easy-summary">'+esc(unifiedSummary || headlineDiag.easyMessage||headlineDiag.message)+'</div>'+wrapDetail(activeR.diag.message+' '+ratioSentence);
   const twinKey = 'twin-'+kTag+'-'+i;
   // 실측 동조율 카드는 처음 렌더링될 때만 쌍둥이 단지 섹션을 기본 펼침하고
-  // 상위 3개로 제한한다 — 이미 기본값을 적용한 적 있으면(twinDefaultOpened)
+  // 기본 노출을 제한한다 — 이미 기본값을 적용한 적 있으면(twinDefaultOpened)
   // 사용자가 수동으로 접었을 수도 있으므로 다시 강제로 펴지 않는다. "단지 1개
   // 진단" 탭은 슬롯 키(twin-s-0)가 고정이라 다른 단지로 바꿔도 같은 키를
   // 재사용하므로, 추정(estimate) 단지로 바뀌면 이전 실측 단지에서 남은
-  // previewLimit=3이 새어들지 않도록 명시적으로 지운다.
+  // previewLimit이 새어들지 않도록 명시적으로 지운다.
+  // 항목(2026-09 세션, "쌍둥이 단지 축소") — 예전엔 상위 N개를 상관계수
+  // 순으로 그냥 슬라이스했는데(previewLimit=3), curated가 갭메우기/닮은꼴/
+  // 괴리를 섞어 정렬한 배열이라 타입 구성이 들쭉날쭉했다. 이제 renderTwinBody가
+  // "닮은꼴 1 + 현재괴리 1"을 타입별로 명시적으로 뽑으므로, 여기서는 개수가
+  // 아니라 "제한 모드 사용 여부"만 불리언으로 표시한다.
   if (isRealSyncCase){
-    twinPreviewLimit.set(twinKey, 3);
+    twinPreviewLimit.set(twinKey, true);
     if (!twinDefaultOpened.has(twinKey)){
       openTwinRows.add(twinKey);
       twinDefaultOpened.add(twinKey);
@@ -5174,6 +5245,11 @@ function renderSingleDiag(name){
   const sync = computeSyncRate(bench, target);
   const estimate = !sync ? findSyncRateEstimate(target) : null;
   const hedge = computeInflationHedge(target);
+  // 재건축 분류 노후단지에는 서울 일반 벤치마크 대비 참고 수치를 추가한다
+  // (등급 없이 raw 숫자만 — buildSeoulRefNote 옆 주석 참고).
+  const seoulRefHtml = (sync && sync.benchmarkGroupKey === 'rebuild')
+    ? buildSeoulRefNote(computeSyncRate(getVirtualBenchmarkComplex('seoul'), target))
+    : '';
   const conclusion = buildSingleConclusion(r.diag, sync, estimate, hedge);
   const caveatHtml = caveat
     ? '<div class="single-caveat">⚠️ 이 단지는 수도권(서울 외) 소재라 '+(groupKey==='rebuild'?'재건축':'서울')+' 선도단지 비교는 참고용입니다.</div>'
@@ -5203,7 +5279,7 @@ function renderSingleDiag(name){
   // "우리 단지 진단하기" 탭은 base가 항상 target 자신의 진짜 선도단지라
   // r과 rVsOwnBench가 사실상 같은 값이다 — 토글을 강제로 비활성화한다
   // (baseIsSameAsCompBench=true).
-  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true, undefined, undefined, true);
+  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true, undefined, seoulRefHtml, true);
   card.innerHTML = built.main;
   syncCardEl.innerHTML = built.syncCard;
   wireTwinToggle(card, target, r);
