@@ -40,6 +40,7 @@
   .badge{ display:inline-block; padding:1px 5px; border-radius:8px; font-size:9px; background:var(--badge-bg); color:var(--badge-text); white-space:nowrap; }
   .badge.badge-price{ background:var(--base-color); color:#fff; font-weight:700; }
   .badge.badge-pyeong{ background:#fff3e0; color:#e65100; }
+  .badge.badge-gap{ background:#e6f7ee; color:#1e8e5a; }
   .complex-card.role-base{ border-color:var(--base-color); box-shadow:0 0 0 1px var(--base-color) inset; }
   .complex-card.role-compare{ border-color:var(--compare-color); box-shadow:0 0 0 1px var(--compare-color) inset; }
   .complex-card .role-badge{ display:none; font-size:9px; font-weight:700; margin-top:2px; }
@@ -463,6 +464,17 @@ function pyeongBadgeText(pyeongType, exclusiveArea){
   return pyeongType + '평';
 }
 
+// 갭투자금(2026-09-22 세션) — 매매가-전세가(부대비용 별도). shared.js의
+// getLatestGapInvestment를 재사용해 계산기 화면(saleStatsHtml)과 같은
+// 로직·같은 숫자를 쓴다. priceInEok과 같은 패턴으로 매번 complex.text를
+// 파싱한다(캐싱 없음 — 이 화면 규모에서 병목 아님, 기존 priceInEok도 동일).
+function gapInEok(complex){
+  const rows = window.SharedLib.parseComplexCsv(complex.text);
+  const g = window.SharedLib.getLatestGapInvestment(rows);
+  if (!g) return null;
+  return Math.round(g.gap / 1000) / 10; // 0.1억 단위 반올림
+}
+
 function cardHtml(complex, priceLabel){
   const role = roleOf(complex.id);
   const roleClass = role ? ' role-'+role : '';
@@ -471,10 +483,12 @@ function cardHtml(complex, priceLabel){
   const unitsBadge = '<span class="badge">'+esc(complex.units!=null ? complex.units+'세대' : '정보없음')+'</span>';
   const pyeongText = pyeongBadgeText(complex.pyeongType, complex.exclusiveArea);
   const pyeongBadge = pyeongText!=null ? '<span class="badge badge-pyeong">'+esc(pyeongText)+'</span>' : '';
+  const gapEok = gapInEok(complex);
+  const gapBadge = gapEok!=null ? '<span class="badge badge-gap" title="갭투자금(매매가-전세가, 부대비용 별도)">갭 '+gapEok.toFixed(1)+'억</span>' : '';
   const priceBadge = priceLabel!=null ? '<span class="badge badge-price">'+priceLabel.toFixed(1)+'억</span>' : '';
   return '<div class="complex-card'+roleClass+'" data-id="'+esc(complex.id)+'">' +
     '<div class="name">'+esc(displayName(complex))+'</div>' +
-    '<div class="badges">'+ageBadge+unitsBadge+pyeongBadge+priceBadge+'</div>' +
+    '<div class="badges">'+ageBadge+unitsBadge+pyeongBadge+gapBadge+priceBadge+'</div>' +
     '<div class="role-badge">'+esc(roleLabel)+'</div>' +
     '</div>';
 }

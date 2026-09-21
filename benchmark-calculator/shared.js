@@ -51,6 +51,22 @@
     return null;
   }
 
+  // "갭투자금"(2026-09-22 세션) — 매매가-전세가 둘 다 있는 가장 최근 달을
+  // 찾아 그 시점 기준으로 갭을 계산한다. getLatestSaleMid처럼 매매/전세를
+  // 각자 따로 최신월을 찾으면 두 값이 서로 다른 달에서 온 걸 뺄 위험이
+  // 있어(예: 전세만 한 달 먼저 끊긴 경우), 반드시 같은 달의 두 값만 쓴다.
+  // 급지표.html·벤치마크_배율_계산기.html 두 화면이 이 값을 공유한다.
+  function getLatestGapInvestment(rows){
+    if (!rows || !rows.length) return null;
+    for (let i=rows.length-1; i>=0; i--){
+      const r = rows[i];
+      if (r.saleMid!=null && r.jeonseMid!=null){
+        return { gap: r.saleMid - r.jeonseMid, ym: r.ym, saleMid: r.saleMid, jeonseMid: r.jeonseMid };
+      }
+    }
+    return null;
+  }
+
   const FIXED_PRICE_BANDS = [
     { label: '30억 이상', min: 300000, max: Infinity },
     { label: '20~30억',   min: 200000, max: 300000 },
@@ -78,7 +94,7 @@
     return builtYear + '년 (' + (now - builtYear) + '년차)';
   }
 
-  const api = { slugify, ensureUniqueId, parseComplexCsv, getLatestSaleMid, computePriceBands, ageLabel };
+  const api = { slugify, ensureUniqueId, parseComplexCsv, getLatestSaleMid, getLatestGapInvestment, computePriceBands, ageLabel };
   if (typeof module !== 'undefined' && module.exports){
     module.exports = api;
     if (typeof window !== 'undefined') window.SharedLib = api;
