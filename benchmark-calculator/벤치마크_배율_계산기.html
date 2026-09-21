@@ -439,6 +439,14 @@ textarea{
 .v.up{color:var(--bad);}
 .v.down{color:var(--info);}
 .card-msg{font-size:12.5px;color:var(--ink-muted);line-height:1.5;}
+/* 항목(2026-09-21 세션, "전세가율 해석 문구 가시성 개선") — 전세가율
+   3종 숫자(.stat-row .v)는 색을 따로 안 정해 본문 기본색(--ink, 고대비)을
+   그대로 쓰는데, 바로 아래 해석 문구는 .card-msg(--ink-muted, 저대비)를
+   써서 대비感이 떨어져 보였다. --ink-muted를 쓰는 다른 여러 곳(.card-msg
+   자체 등)에는 영향 없이 이 문구만 --ink로 올리는 전용 클래스를 둔다.
+   --ink/--ink-muted 둘 다 다크모드 미디어쿼리에서 이미 재정의돼 있어
+   별도 다크모드 처리가 필요 없다. */
+.jeonse-structural-note{font-size:12.5px;color:var(--ink);line-height:1.5;}
 .reinforce-msg{font-size:12.5px;line-height:1.5;padding:8px 10px;border-radius:8px;}
 .reinforce-msg.bad{background:var(--bad-bg);color:var(--bad);}
 .sync-block{border-top:1px solid var(--border);padding-top:10px;margin-top:2px;display:flex;flex-direction:column;gap:5px;}
@@ -1422,22 +1430,26 @@ function jeonseRatioContextSentence(diagBadge, stats, threshold){
   if (belowAvg) return '참고로 이 단지의 전세가율은 역사상 평균보다 '+Math.abs(stats.diff).toFixed(1)+'%p 낮은 편입니다.';
   return '이 단지의 전세가율도 역사상 평균 범위 안에서 움직이고 있습니다.';
 }
-// 항목(2026-09-21 세션, "전세가율 심화분석 해석 문구 추가") — 위
+// 항목(2026-09-21 세션, "전세가율 심화분석 해석 문구 추가/재작성") — 위
 // jeonseRatioContextSentence는 "이 전세가율이 고평가/저평가 판단을
 // 강화/약화하는 신호인가"를 말하는 문장이고, 이 함수는 배지와 무관하게
 // "전세가를 실수요 기준(거품 없는 본질가치)으로 볼 때 지금 매매가가 그
 // 대비 얼마나 벌어져 있는가"라는 구조적 설명만 담당한다(전세가율
 // 3종 수치 바로 아래, 심화분석에 노출) — 서로 역할이 겹치지 않는 별도
 // 문장이다. 절대 방향성 예측("전세가가 오를 것이다/내릴 것이다")을
-// 넣지 않는다 — "올라온다면"처럼 가정형으로만 쓴다. 임계값은
-// decoupleInterpretation(선도단지 디커플링 판정)과 같은 ±3%p를 재사용해
-// "구조적 위치 판정"이라는 개념을 이 계산기 안에서 통일한다.
+// 넣지 않는다 — "낮아진다면"처럼 가정형으로만 쓰고, "~신호일 수
+// 있습니다" 같은 가능성 표현은 현재 상태에 대한 조건부 해석이지 앞으로
+// 어떻게 될 거라는 예측이 아니다(2026-09-21 세션 피드백 — 초안 문구가
+// "추가 상승 여력의 근거"처럼 미래 상승을 암시한다는 지적을 받아 재작성).
+// 임계값은 decoupleInterpretation(선도단지 디커플링 판정)과 같은 ±3%p를
+// 재사용해 "구조적 위치 판정"이라는 개념을 이 계산기 안에서 통일한다.
 const JEONSE_STRUCTURAL_NOTE_THRESHOLD = 3;
 function jeonseRatioStructuralNote(stats){
   if (!stats || stats.diff==null) return '';
-  if (stats.diff <= -JEONSE_STRUCTURAL_NOTE_THRESHOLD) return '매매가가 전세가(실수요 기준) 대비 앞서 나가 있는 상태입니다. 전세가 수준이 올라온다면 그만큼 매매가 상승분이 실수요로 뒷받침되는 것이라, 추가 상승 여력의 근거가 될 수 있습니다.';
-  if (stats.diff >= JEONSE_STRUCTURAL_NOTE_THRESHOLD) return '전세가가 매매가에 바짝 따라붙은 상태로, 실수요 대비 매매가가 상대적으로 눌려 있는 편입니다.';
-  return '매매가와 전세가(실수요 기준)가 균형 잡힌 수준입니다.';
+  const compareTip = ' 이 단지의 가격 수준을 선도단지와 비교해서 보면 판단에 도움이 됩니다.';
+  if (stats.diff <= -JEONSE_STRUCTURAL_NOTE_THRESHOLD) return '매매가가 전세가(실수요 기준) 대비 앞서 나가 있는 상태입니다. 전세가율이 지금보다 더 낮아진다면, 실제 수요 대비 매수 수요가 과열됐다는 신호일 수 있습니다. 특히 역사적 최저 수준에 가까워질수록 그만큼 현재 가격 수준이 높다는 것을 의미합니다.'+compareTip;
+  if (stats.diff >= JEONSE_STRUCTURAL_NOTE_THRESHOLD) return '전세가가 매매가에 바짝 따라붙은 상태로, 실수요 대비 매매가가 상대적으로 눌려 있는 편입니다.'+compareTip;
+  return '매매가와 전세가(실수요 기준)가 균형 잡힌 수준입니다.'+compareTip;
 }
 
 const SEOUL_GU = new Set(['강남구','강동구','강북구','강서구','관악구','광진구','구로구','금천구','노원구','도봉구','동대문구','동작구','마포구','서대문구','서초구','성동구','성북구','송파구','양천구','영등포구','용산구','은평구','종로구','중구','중랑구']);
@@ -3545,11 +3557,10 @@ function clearOverridesForSection(map, sectionKey){
   const prefix = sectionKey+'::';
   Array.from(map.keys()).forEach(k => { if (k.startsWith(prefix)) map.delete(k); });
 }
-// 실측 동조율 카드는 "준거단지" 리스트가 없는 대신 쌍둥이 단지 상위 3개를
-// 동조율 블록 자리에 기본 노출한다(2026-09 세션, 항목 2). 사용자가 직접
-// 접었다 폈다 할 수 있어야 하므로, "이미 한 번 기본값을 적용했는지"를
-// twinDefaultOpened로 따로 추적해 재렌더링 때마다 강제로 다시 펴지 않게 한다.
-const twinDefaultOpened = new Set();
+// 실측 동조율 카드는 "준거단지" 리스트가 없는 대신 쌍둥이 단지 상위 2개
+// (닮은꼴1+괴리1)를 previewLimit으로 제한 노출한다(2026-09 세션, 항목 2;
+// 2026-09-21 세션부터 단일진단은 이 2장을 칸1/칸2에 renderTwinSplitPreview로
+// 직접 보여준다).
 const twinPreviewLimit = new Map(); // key(twinKey) -> 기본 노출 개수 제한(3) — 없으면 전체(curated+rest) 노출
 function chartModeToggleHtml(key){
   const mode = chartModeState.get(key) || 'index';
@@ -3572,14 +3583,168 @@ function fairPriceInterpretation(twinName, fair, curSalePrice){
   const diffPct = curSalePrice!=null ? (fair.fairPrice - curSalePrice) / curSalePrice * 100 : null;
   return ' '+withParticle(twinName, '과', '와')+'의 역사적 관계가 맞다면, 이 단지의 적정가는 약 '+fmtEok(fair.fairPrice)+' 수준으로 추정됩니다'+(diffPct!=null ? ' (현재가 대비 '+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'% 차이)' : '')+'.';
 }
-function renderTwinBody(body, comp, r, key){
+// 쌍둥이 카드 1장 단위 순수 헬퍼 — renderTwinBody(전체 목록)와
+// renderTwinSplitPreview(단일진단 칸1/2 미리보기, 2026-09-21 세션)가
+// 함께 재사용한다. t 하나(+comp/r/bestFairPriceCandidate 등 필요한 것만
+// 명시적 인자로)만으로 결정되는 표시 로직이라 클로저 대신 최상위 함수로
+// 뺐다 — "갭메우기 이력" 배지는 대상(twin 자신 vs 서울 선도단지)이
+// 라벨만 봐서는 안 보여 "기준단지와 이 twin 사이"의 이력으로 오해하기
+// 쉬웠다(2026-09 세션) — 라벨에 "(vs 선도단지)"를 짧게 덧붙이고, 기존에도
+// 이 앱 전역에서 쓰던 info-icon+data-tip 툴팁 패턴을 재사용해 줄글
+// 설명을 곁들인다. "닮은꼴" 슬롯이 상관계수 1위(동조)와 상승폭 유사도
+// 1위(amp)로 나뉘면서, 같은 "닮은꼴"이라도 서로 다른 기준으로 뽑혔다는
+// 걸 배지 문구/색으로 구분해야 사용자가 두 슬롯의 정보가 다르다는 걸
+// 알 수 있다(하나는 방향성, 하나는 실제 등락폭 자체).
+function twinMatchTypeTag(t){
+  return t.matchType==='closed' ? '<span class="twin-match-tag closed">🎯 갭메우기 이력(vs 선도단지)</span><span class="info-icon" tabindex="0" data-tip="'+esc(GAP_HISTORY_TAG_TOOLTIP)+'">ⓘ</span>'
+    : t.matchType==='similar' ? (t.similarReason==='amp'
+        ? '<span class="twin-match-tag similar-amp">📈 상승폭 유사 1위</span><span class="info-icon" tabindex="0" data-tip="'+esc(SIMILAR_AMP_TAG_TOOLTIP)+'">ⓘ</span>'
+        : '<span class="twin-match-tag similar">🎯 동조 1위</span><span class="info-icon" tabindex="0" data-tip="'+esc(SIMILAR_CORR_TAG_TOOLTIP)+'">ⓘ</span>')
+    : t.matchType==='gap' ? '<span class="twin-match-tag gap'+(t.gapSeverity==='strong'?' strong':'')+'">📊 '+(t.gapSeverity==='strong'?'뚜렷한 괴리':'괴리')+'</span>'
+    : '';
+}
+function twinOngoingBadge(t){
+  return (t.matchType==='closed' && t.gapStats.ongoingMonths > 0)
+    ? '<span class="twin-ongoing-badge">⏳ 진행중('+t.gapStats.ongoingMonths+'개월째)</span>'
+    : '';
+}
+// "갭메우기 이력" 카드에는 기준단지의 매매/전세 배율(이미 계산된 값)을 같이
+// 보여줘 "매매만 일시적으로 눌린 건지" 확인할 수 있게 한다.
+function twinRatioLine(t, r){
+  return t.matchType === 'closed'
+    ? '<div class="twin-ratio-line">기준단지 매매 배율(현재/평균) '+fmtPct(r.currentSaleRatio)+' / '+fmtPct(r.avgSaleRatio)+' · 전세 배율(현재/평균) '+fmtPct(r.currentJeonseRatio)+' / '+fmtPct(r.avgJeonseRatio)+'</div>'
+    : '';
+}
+function twinIsBestFairPrice(t, bestFairPriceCandidate){
+  return !!(bestFairPriceCandidate && t.name === bestFairPriceCandidate.name);
+}
+function twinEasyOf(t, fair, r){
+  const base = t.matchType === 'closed' ? gapEpisodeEasySummary(t.name, t.gapStats) : twinEasySummary(t);
+  return fair ? base + fairPriceInterpretation(t.name, fair, r.curSalePrice) : base;
+}
+function twinClsOf(t){
+  return classifyTwinVsBenchDeviation(t.compBenchDecoupling, t.twinBenchDecoupling);
+}
+function twinDetailOf(t){
+  return t.matchType === 'closed'
+    ? gapEpisodeStatsText(t.name, t.gapStats) + twinVsBenchNote(t, twinClsOf(t))
+    : twinInterpretationText(t);
+}
+function twinPredictionMonthsOf(t){
+  return (t.matchType==='closed' && t.gapStats.episodeCount>0 && t.gapStats.avgDuration) ? Math.round(t.gapStats.avgDuration) : 0;
+}
+// 쌍둥이 카드 1장의 HTML(부가 정보 포함)을 만든다 — idx는 이 카드가
+// 놓일 컨테이너 안에서만 유일하면 되므로(각자 다른 컨테이너의 querySelector로
+// 스코프됨), renderTwinBody의 목록에서는 페이지 내 순번을, renderTwinSplitPreview
+// 에서는 항상 0을 넘긴다.
+function buildTwinCardHtml(t, idx, comp, r, bestFairPriceCandidate, iMode, iRangeMode, iShowBench){
+  const pm = twinPredictionMonthsOf(t);
+  const cls = twinClsOf(t);
+  // E-3: 베스트 갭메우기 사례는 방향예측 대신 적정가 추정 점선을 그린다 —
+  // 이 경우 cls(bothDeviated 등) 기반 억제를 적용하지 않는다. comp/twin
+  // 배율 역산이라 어느 쪽이 선도단지 기준 이탈했는지와 무관하게 방향이
+  // 명확하기 때문이다.
+  const fair = twinIsBestFairPrice(t, bestFairPriceCandidate) ? computeFairPriceEstimate(comp, t) : null;
+  const fairIndexVal = fair ? fairPriceToIndexValue(comp, t.overlapYms, fair.fairPrice) : null;
+  const predictionShown = pm>0 && iMode!=='price' && iRangeMode!=='full' && (fairIndexVal!=null || (cls!=='bothDeviated' && cls!=='neitherDeviated'));
+  const predictionLabel = cls==='twinDeviated' ? withParticle(t.name, '이', '가')+' 기준단지 쪽으로' : '기준단지가 '+esc(t.name)+' 쪽으로';
+  const predictionNoteHtml = !predictionShown ? '' : fairIndexVal!=null
+    ? '<div class="twin-chart-note prediction-note">회색 점선 = 과거 평균 회복기간(약 '+pm+'개월) 기준, '+withParticle(t.name, '과', '와')+'의 역사적 관계로 역산한 적정가 추정 시나리오(예측 아님)</div>'
+    : '<div class="twin-chart-note prediction-note">회색 점선 = 과거 평균 회복기간(약 '+pm+'개월) 기준, '+predictionLabel+' 움직이는 참고용 시나리오(예측 아님)</div>';
+  const episodes = (t.matchType === 'closed' && iRangeMode!=='full') ? t.gapStats.episodes : null;
+  const hasDrawableEpisodes = !!(episodes && episodes.length);
+  // 빨간 음영 설명도 실제 탐지 결과에 맞춰 동적으로 바꾼다 — 이탈이 없으면
+  // 음영 자체가 안 그려지므로 "정상 범위"라고 명시한다(2026-09-18 세션
+  // 재설계 항목 3, 고정 "최근 3개월" 문구 폐기).
+  const decoupleNoteHtml = t.decoupling && t.decoupling.deviated
+    ? ' · 빨간 음영='+fmtYm(t.decoupling.onsetYm)+'부터 진행중인 이탈('+t.decoupling.duration+'개월째)'
+    : ' · 현재 뚜렷한 이탈 없음(정상 범위)';
+  // 선도단지 선(주황 점선) 범례 — 항목 4에서 매치타입 무관하게 카드별
+  // 토글로 켤 수 있게 됐고, 다음 라운드(항목 3)부터는 전체기간 모드에서도
+  // 선도단지 선을 그릴 수 있어(자기 데이터 첫 달=100 독립 인덱스화) 더 이상
+  // rangeMode로 걸러낼 필요가 없다 — iShowBench만 보면 된다.
+  const benchLineNoteHtml = (iShowBench && iMode!=='price') ? ' · 주황 점선=서울 선도단지' : '';
+  // 전체기간 모드는 이탈 음영·에피소드·예측선 같은 겹치는 구간 전용 부가
+  // 요소만 뺀다(twinMiniChartConfig 참조) — 선도단지 선은 예외.
+  const rangeNoteHtml = iRangeMode === 'full' ? ' · 전체기간 함께 보기(겹치지 않는 구간은 한쪽 선만 표시, 예측선 등 일부 부가 요소 생략)' : '';
+  // 항목 2/4: 카드별 개별 토글 3종 — 실제가격/상승률, 겹침/전체기간,
+  // 선도단지 흐름. 선도단지 토글은 가격모드에서만 숨긴다(가격대 차이가
+  // 커서 기존 규칙대로 제외 — 전체기간 모드에서는 다음 라운드부터 지원).
+  const itemToggleRowHtml = '<div class="card-toggle-row">'+
+    '<button class="chart-mode-toggle" data-item-mode-toggle="'+idx+'">'+(iMode==='index'?'💰가격':'📈상승률')+'</button>'+
+    '<button class="chart-mode-toggle" data-item-range-toggle="'+idx+'">'+(iRangeMode==='overlap'?'🗓️전체기간':'🔗겹침만')+'</button>'+
+    (iMode==='price' ? '' : '<button class="chart-mode-toggle" data-item-bench-toggle="'+idx+'">'+(iShowBench?'🏙️선도단지 끄기':'🏙️선도단지 보기')+'</button>')+
+  '</div>';
+  // 항목(2026-09 세션, "쌍둥이 단지 등급 텍스트") — "닮은꼴" 카드만 정확한
+  // 상관계수 숫자를 등급 문구로 바꾼다. "현재 괴리" 카드는 괴리폭이
+  // 핵심 메시지라 기존처럼 숫자를 그대로 둔다(twinSimilarityLabel 옆
+  // 주석 참고). 상세보기(twinInterpretationText)는 매치타입과 무관하게
+  // 항상 정확한 숫자를 유지한다.
+  const corrDisplay = t.matchType === 'similar' ? twinSimilarityLabel(t.corr) : '상관계수 '+t.corr.toFixed(2);
+  return '<div class="twin-card">'+
+    '<div class="twin-card-head">'+twinMatchTypeTag(t)+' '+twinOngoingBadge(t)+' '+esc(t.name)+' <span class="cell-ratio">('+corrDisplay+', 겹치는 구간 '+t.overlapMonths+'개월)</span></div>'+
+    itemToggleRowHtml+
+    '<div class="twin-chart-note">'+(iMode==='price'?'실제 가격(억원) · 같은 축 공유':'양쪽 모두 시작 시점 대비 상승률(%) · 그래프의 지점을 클릭하면 그 지점을 새 기준점으로 다시 계산합니다')+(iRangeMode==='full' ? '' : decoupleNoteHtml+(hasDrawableEpisodes?' · 파란 음영=과거 완결된 갭메우기 에피소드':''))+benchLineNoteHtml+rangeNoteHtml+'</div>'+
+    predictionNoteHtml+
+    (iMode==='price' ? '' : '<button class="chart-mode-toggle" data-twin-reset="'+idx+'" hidden>↺ 기준점 초기화</button>')+
+    '<div class="twin-chart-wrap"><canvas data-twin-canvas="'+idx+'"></canvas></div>'+
+    (hasDrawableEpisodes ? gapEpisodesCaptionHtml(t.overlapYms, episodes) : '')+
+    twinRatioLine(t, r)+
+    '<div class="twin-msg easy-summary">'+twinEasyOf(t, fair, r)+'</div>'+
+    wrapDetail(twinDetailOf(t))+
+    '<button class="view-multi-btn" data-twin-view="'+idx+'">📊 여러 단지 비교에서 보기</button>'+
+  '</div>';
+}
+// buildTwinCardHtml로 그려 넣은 카드 1장의 차트·토글·"여러 단지 비교에서
+// 보기" 버튼을 연결한다. containerEl 범위 안에서만 querySelector하므로
+// (data-twin-canvas="idx" 등) idx가 다른 컨테이너와 겹쳐도 안전하다.
+// rerender는 토글 클릭 시 이 카드를 다시 그리는 콜백 — renderTwinBody의
+// 목록에서는 전체 목록을 다시 그리고, renderTwinSplitPreview에서는 이
+// 카드 하나만 다시 그린다.
+function wireOneTwinCard(containerEl, t, idx, comp, r, bestFairPriceCandidate, iMode, iRangeMode, iShowBench, itemKey, rerender){
+  const benchForGapHistory = getVirtualBenchmarkComplex('seoul');
+  const canvas = containerEl.querySelector('[data-twin-canvas="'+idx+'"]');
+  const fair = twinIsBestFairPrice(t, bestFairPriceCandidate) ? computeFairPriceEstimate(comp, t) : null;
+  const fairIndexVal = fair ? fairPriceToIndexValue(comp, t.overlapYms, fair.fairPrice) : null;
+  const episodes = t.matchType === 'closed' ? t.gapStats.episodes : null;
+  if (canvas){
+    const chart = new Chart(canvas, twinMiniChartConfig(comp, t.complex, t.name, t.overlapYms, iMode, twinPredictionMonthsOf(t), twinClsOf(t), fairIndexVal, episodes, t.decoupling, iShowBench, benchForGapHistory, iRangeMode));
+    // 항목 4(2026-09 세션) — refMiniChartConfig(준거단지)에 있던 "클릭해서
+    // 기준점 재설정" 기능을 쌍둥이/갭메우기 미니차트에도 동일하게 붙인다.
+    if (iMode !== 'price') wireChartRebase(chart, canvas, containerEl.querySelector('[data-twin-reset="'+idx+'"]'));
+  }
+  const viewBtn = containerEl.querySelector('[data-twin-view="'+idx+'"]');
+  if (viewBtn) viewBtn.addEventListener('click', () => handleViewMultiClick(comp.name, t.name, viewBtn));
+  const itemModeBtn = containerEl.querySelector('[data-item-mode-toggle="'+idx+'"]');
+  if (itemModeBtn) itemModeBtn.addEventListener('click', () => {
+    cardChartModeOverride.set(itemKey, iMode === 'index' ? 'price' : 'index');
+    rerender();
+  });
+  const itemRangeBtn = containerEl.querySelector('[data-item-range-toggle="'+idx+'"]');
+  if (itemRangeBtn) itemRangeBtn.addEventListener('click', () => {
+    cardRangeModeOverride.set(itemKey, iRangeMode === 'overlap' ? 'full' : 'overlap');
+    rerender();
+  });
+  const itemBenchBtn = containerEl.querySelector('[data-item-bench-toggle="'+idx+'"]');
+  if (itemBenchBtn) itemBenchBtn.addEventListener('click', () => {
+    cardBenchLineOverride.set(itemKey, !iShowBench);
+    rerender();
+  });
+}
+// hideTopPreview: 단일진단(#singleDiagSection) 칸1/2에 이미 닮은꼴1위/
+// 현재괴리1위를 별도로 미리보기로 보여주는 경우(renderTwinSplitPreview),
+// "쌍둥이 단지 보기" 패널 본문에서는 그 2장을 중복 노출하지 않고 바로
+// 나머지(overflowCurated+rest)부터 보여준다(2026-09-21 세션). 다중비교
+// 탭은 칸1/2 개념이 없어 이 플래그 없이 기존처럼 본문 안에 닮은꼴1위/
+// 현재괴리1위가 그대로 포함된다.
+function renderTwinBody(body, comp, r, key, hideTopPreview){
   const { curated: rawCurated, rest: rawRest, bestFairPriceCandidate } = findTwinCandidates(comp);
   // 항목(2026-09 세션, "갭메우기 이력 UI 숨김") — 계산 레이어(closed 분류,
   // gapStats, historicalGapEpisodes)는 findTwinCandidates 안에 그대로 두고,
   // 렌더링 목록에서만 matchType==='closed'를 걸러낸다. E-3 적정가 추정과
-  // 예측 점선은 둘 다 matchType==='closed'에만 종속돼 있어(isBestFairPrice/
-  // predictionMonthsOf 참고) 이 필터 하나로 자동으로 함께 꺼진다 — 재활성화가
-  // 필요해지면 이 두 줄만 되돌리면 된다.
+  // 예측 점선은 둘 다 matchType==='closed'에만 종속돼 있어(twinIsBestFairPrice/
+  // twinPredictionMonthsOf 참고) 이 필터 하나로 자동으로 함께 꺼진다 —
+  // 재활성화가 필요해지면 이 두 줄만 되돌리면 된다.
   const curated = rawCurated.filter(t => t.matchType !== 'closed');
   const rest = rawRest.filter(t => t.matchType !== 'closed');
   if (!curated.length && !rest.length){
@@ -3588,12 +3753,12 @@ function renderTwinBody(body, comp, r, key){
   }
   // 기본 노출은 curated(닮은꼴2+괴리2)만 — 페이지 번호 없이 그대로 보여준다.
   // 그 이후(rest)는 "더보기"를 눌러야만 페이지네이션이 나타난다.
-  // previewLimit이 있으면(실측 동조율 카드의 기본 노출, 2026-09 세션 항목 2)
-  // curated 전체가 아니라 "닮은꼴 1 + 현재괴리 1"만 먼저 보여준다(2026-09
-  // 세션, "쌍둥이 단지 축소") — 예전엔 상관계수 순으로 상위 N개를 그냥
-  // slice했는데, curated가 닮은꼴/괴리를 섞어 정렬한 배열이라 어느 쪽이
-  // 몇 개 걸릴지 들쭉날쭉했다. 이제 타입별로 명시적으로 1개씩 뽑아, 나머지는
-  // 상관계수 내림차순을 유지한 채 오버플로로 보낸다.
+  // previewLimit이 있으면(실측 동조율 카드) curated 전체가 아니라 "닮은꼴
+  // 1 + 현재괴리 1"만 먼저 보여준다(2026-09 세션, "쌍둥이 단지 축소") —
+  // 예전엔 상관계수 순으로 상위 N개를 그냥 slice했는데, curated가 닮은꼴/
+  // 괴리를 섞어 정렬한 배열이라 어느 쪽이 몇 개 걸릴지 들쭉날쭉했다.
+  // 이제 타입별로 명시적으로 1개씩 뽑아, 나머지는 상관계수 내림차순을
+  // 유지한 채 오버플로로 보낸다.
   const previewLimit = twinPreviewLimit.get(key) || null;
   let visibleCurated, overflowCurated;
   if (previewLimit){
@@ -3607,46 +3772,16 @@ function renderTwinBody(body, comp, r, key){
     overflowCurated = [];
   }
   const restPool = overflowCurated.concat(rest);
-  const moreOpen = twinMoreOpen.has(key);
+  // 단일진단 칸1/2에 이미 visibleCurated를 따로 보여주는 경우
+  // (skipPreviewInBody), 이 본문은 처음부터 "더보기를 이미 누른 것"처럼
+  // 취급해 restPool부터 페이지네이션으로 보여준다 — curated 재노출도,
+  // 별도 "더보기" 클릭도 필요 없다.
+  const skipPreviewInBody = !!(hideTopPreview && previewLimit);
+  const moreOpen = skipPreviewInBody ? true : twinMoreOpen.has(key);
   const totalRestPages = Math.ceil(restPool.length / TWIN_PAGE_SIZE);
   const page = Math.min(Math.max(twinPageState.get(key) || 1, 1), Math.max(totalRestPages, 1));
   twinPageState.set(key, page);
   const restItems = moreOpen ? restPool.slice((page-1)*TWIN_PAGE_SIZE, page*TWIN_PAGE_SIZE) : [];
-  // "갭메우기 이력" 배지는 대상(twin 자신 vs 서울 선도단지)이 라벨만 봐서는
-  // 안 보여 "기준단지와 이 twin 사이"의 이력으로 오해하기 쉬웠다(2026-09
-  // 세션) — 라벨에 "(vs 선도단지)"를 짧게 덧붙이고, 기존에도 이 앱 전역에서
-  // 쓰던 info-icon+data-tip 툴팁 패턴(M2 대비 위치/동조율/인플레이션 헤지와
-  // 동일)을 재사용해 줄글 설명을 곁들인다. 닮은꼴/괴리 배지는 애초에
-  // comp-twin 직접 관계(상관계수·computeTwinDecoupling)를 그대로 나타내므로
-  // 같은 오해 소지가 없어 손대지 않았다.
-  // 항목(2026-09-20 세션) — "닮은꼴" 슬롯이 상관계수 1위(동조)와 상승폭
-  // 유사도 1위(amp)로 나뉘면서, 같은 "닮은꼴"이라도 서로 다른 기준으로
-  // 뽑혔다는 걸 배지 문구/색으로 구분해야 사용자가 두 슬롯의 정보가
-  // 다르다는 걸 알 수 있다(하나는 방향성, 하나는 실제 등락폭 자체).
-  const matchTypeTag = (t) => t.matchType==='closed' ? '<span class="twin-match-tag closed">🎯 갭메우기 이력(vs 선도단지)</span><span class="info-icon" tabindex="0" data-tip="'+esc(GAP_HISTORY_TAG_TOOLTIP)+'">ⓘ</span>'
-    : t.matchType==='similar' ? (t.similarReason==='amp'
-        ? '<span class="twin-match-tag similar-amp">📈 상승폭 유사 1위</span><span class="info-icon" tabindex="0" data-tip="'+esc(SIMILAR_AMP_TAG_TOOLTIP)+'">ⓘ</span>'
-        : '<span class="twin-match-tag similar">🎯 동조 1위</span><span class="info-icon" tabindex="0" data-tip="'+esc(SIMILAR_CORR_TAG_TOOLTIP)+'">ⓘ</span>')
-    : t.matchType==='gap' ? '<span class="twin-match-tag gap'+(t.gapSeverity==='strong'?' strong':'')+'">📊 '+(t.gapSeverity==='strong'?'뚜렷한 괴리':'괴리')+'</span>'
-    : '';
-  const ongoingBadge = (t) => (t.matchType==='closed' && t.gapStats.ongoingMonths > 0)
-    ? '<span class="twin-ongoing-badge">⏳ 진행중('+t.gapStats.ongoingMonths+'개월째)</span>'
-    : '';
-  // "갭메우기 이력" 카드에는 기준단지의 매매/전세 배율(이미 계산된 값)을 같이
-  // 보여줘 "매매만 일시적으로 눌린 건지" 확인할 수 있게 한다.
-  const ratioLine = (t) => t.matchType === 'closed'
-    ? '<div class="twin-ratio-line">기준단지 매매 배율(현재/평균) '+fmtPct(r.currentSaleRatio)+' / '+fmtPct(r.avgSaleRatio)+' · 전세 배율(현재/평균) '+fmtPct(r.currentJeonseRatio)+' / '+fmtPct(r.avgJeonseRatio)+'</div>'
-    : '';
-  const isBestFairPrice = (t) => !!(bestFairPriceCandidate && t.name === bestFairPriceCandidate.name);
-  const easyOf = (t, fair) => {
-    const base = t.matchType === 'closed' ? gapEpisodeEasySummary(t.name, t.gapStats) : twinEasySummary(t);
-    return fair ? base + fairPriceInterpretation(t.name, fair, r.curSalePrice) : base;
-  };
-  const clsOf = (t) => classifyTwinVsBenchDeviation(t.compBenchDecoupling, t.twinBenchDecoupling);
-  const detailOf = (t) => t.matchType === 'closed'
-    ? gapEpisodeStatsText(t.name, t.gapStats) + twinVsBenchNote(t, clsOf(t))
-    : twinInterpretationText(t);
-  const predictionMonthsOf = (t) => (t.matchType==='closed' && t.gapStats.episodeCount>0 && t.gapStats.avgDuration) ? Math.round(t.gapStats.avgDuration) : 0;
   const moreBtnHtml = !moreOpen && restPool.length > 0
     ? '<button class="twin-more-btn" data-twin-more="1">더보기 ('+restPool.length+'개 더 보기)</button>'
     : '';
@@ -3657,7 +3792,7 @@ function renderTwinBody(body, comp, r, key){
   // 것처럼 보였다 — 1페이지(또는 "더보기"를 아직 안 눌러 기본 노출 중인
   // 상태)에서만 curated를 보여주고, 2페이지부터는 반복 없이 순수하게
   // 새로운 후보(restItems)만 보여준다.
-  const showCurated = !moreOpen || page === 1;
+  const showCurated = skipPreviewInBody ? false : (!moreOpen || page === 1);
   const pageCurated = showCurated ? visibleCurated : [];
   const pagedAllItems = pageCurated.concat(restItems);
   // curated(고정 추천 4~6개)와 rest(더보기 풀)를 시각적으로 구분하는 레이블 —
@@ -3674,104 +3809,11 @@ function renderTwinBody(body, comp, r, key){
   const itemRangeModeOf = (t) => { const k = itemOverrideKey(key, t.name); return cardRangeModeOverride.get(k) || rangeMode; };
   const itemShowBenchOf = (t) => { const k = itemOverrideKey(key, t.name); return cardBenchLineOverride.has(k) ? cardBenchLineOverride.get(k) : (t.matchType === 'closed'); };
   body.innerHTML = TWIN_CATEGORY_LEGEND + chartModeToggleHtml(key) + rangeModeToggleHtml(key) + curatedLabelHtml + pagedAllItems.map((t, idx) => {
-    const iMode = itemModeOf(t);
-    const iRangeMode = itemRangeModeOf(t);
-    const iShowBench = itemShowBenchOf(t);
-    const pm = predictionMonthsOf(t);
-    const cls = clsOf(t);
-    // E-3: 베스트 갭메우기 사례는 방향예측 대신 적정가 추정 점선을 그린다 —
-    // 이 경우 cls(bothDeviated 등) 기반 억제를 적용하지 않는다. comp/twin
-    // 배율 역산이라 어느 쪽이 선도단지 기준 이탈했는지와 무관하게 방향이
-    // 명확하기 때문이다.
-    const fair = isBestFairPrice(t) ? computeFairPriceEstimate(comp, t) : null;
-    const fairIndexVal = fair ? fairPriceToIndexValue(comp, t.overlapYms, fair.fairPrice) : null;
-    const predictionShown = pm>0 && iMode!=='price' && iRangeMode!=='full' && (fairIndexVal!=null || (cls!=='bothDeviated' && cls!=='neitherDeviated'));
-    const predictionLabel = cls==='twinDeviated' ? withParticle(t.name, '이', '가')+' 기준단지 쪽으로' : '기준단지가 '+esc(t.name)+' 쪽으로';
-    const predictionNoteHtml = !predictionShown ? '' : fairIndexVal!=null
-      ? '<div class="twin-chart-note prediction-note">회색 점선 = 과거 평균 회복기간(약 '+pm+'개월) 기준, '+withParticle(t.name, '과', '와')+'의 역사적 관계로 역산한 적정가 추정 시나리오(예측 아님)</div>'
-      : '<div class="twin-chart-note prediction-note">회색 점선 = 과거 평균 회복기간(약 '+pm+'개월) 기준, '+predictionLabel+' 움직이는 참고용 시나리오(예측 아님)</div>';
-    const episodes = (t.matchType === 'closed' && iRangeMode!=='full') ? t.gapStats.episodes : null;
-    const hasDrawableEpisodes = !!(episodes && episodes.length);
-    // 빨간 음영 설명도 실제 탐지 결과에 맞춰 동적으로 바꾼다 — 이탈이 없으면
-    // 음영 자체가 안 그려지므로 "정상 범위"라고 명시한다(2026-09-18 세션
-    // 재설계 항목 3, 고정 "최근 3개월" 문구 폐기).
-    const decoupleNoteHtml = t.decoupling && t.decoupling.deviated
-      ? ' · 빨간 음영='+fmtYm(t.decoupling.onsetYm)+'부터 진행중인 이탈('+t.decoupling.duration+'개월째)'
-      : ' · 현재 뚜렷한 이탈 없음(정상 범위)';
-    // 선도단지 선(주황 점선) 범례 — 항목 4에서 매치타입 무관하게 카드별
-    // 토글로 켤 수 있게 됐고, 다음 라운드(항목 3)부터는 전체기간 모드에서도
-    // 선도단지 선을 그릴 수 있어(자기 데이터 첫 달=100 독립 인덱스화) 더 이상
-    // rangeMode로 걸러낼 필요가 없다 — iShowBench만 보면 된다.
-    const benchLineNoteHtml = (iShowBench && iMode!=='price') ? ' · 주황 점선=서울 선도단지' : '';
-    // 전체기간 모드는 이탈 음영·에피소드·예측선 같은 겹치는 구간 전용 부가
-    // 요소만 뺀다(twinMiniChartConfig 참조) — 선도단지 선은 예외.
-    const rangeNoteHtml = iRangeMode === 'full' ? ' · 전체기간 함께 보기(겹치지 않는 구간은 한쪽 선만 표시, 예측선 등 일부 부가 요소 생략)' : '';
     const sectionDividerHtml = (idx === pageCurated.length) ? restLabelHtml : '';
-    // 항목 2/4: 카드별 개별 토글 3종 — 실제가격/상승률, 겹침/전체기간,
-    // 선도단지 흐름. 선도단지 토글은 가격모드에서만 숨긴다(가격대 차이가
-    // 커서 기존 규칙대로 제외 — 전체기간 모드에서는 다음 라운드부터 지원).
-    const itemToggleRowHtml = '<div class="card-toggle-row">'+
-      '<button class="chart-mode-toggle" data-item-mode-toggle="'+idx+'">'+(iMode==='index'?'💰가격':'📈상승률')+'</button>'+
-      '<button class="chart-mode-toggle" data-item-range-toggle="'+idx+'">'+(iRangeMode==='overlap'?'🗓️전체기간':'🔗겹침만')+'</button>'+
-      (iMode==='price' ? '' : '<button class="chart-mode-toggle" data-item-bench-toggle="'+idx+'">'+(iShowBench?'🏙️선도단지 끄기':'🏙️선도단지 보기')+'</button>')+
-    '</div>';
-    // 항목(2026-09 세션, "쌍둥이 단지 등급 텍스트") — "닮은꼴" 카드만 정확한
-    // 상관계수 숫자를 등급 문구로 바꾼다. "현재 괴리" 카드는 괴리폭이
-    // 핵심 메시지라 기존처럼 숫자를 그대로 둔다(twinSimilarityLabel 옆
-    // 주석 참고). 상세보기(twinInterpretationText)는 매치타입과 무관하게
-    // 항상 정확한 숫자를 유지한다.
-    const corrDisplay = t.matchType === 'similar' ? twinSimilarityLabel(t.corr) : '상관계수 '+t.corr.toFixed(2);
-    return sectionDividerHtml + '<div class="twin-card">'+
-      '<div class="twin-card-head">'+matchTypeTag(t)+' '+ongoingBadge(t)+' '+esc(t.name)+' <span class="cell-ratio">('+corrDisplay+', 겹치는 구간 '+t.overlapMonths+'개월)</span></div>'+
-      itemToggleRowHtml+
-      '<div class="twin-chart-note">'+(iMode==='price'?'실제 가격(억원) · 같은 축 공유':'양쪽 모두 시작 시점 대비 상승률(%) · 그래프의 지점을 클릭하면 그 지점을 새 기준점으로 다시 계산합니다')+(iRangeMode==='full' ? '' : decoupleNoteHtml+(hasDrawableEpisodes?' · 파란 음영=과거 완결된 갭메우기 에피소드':''))+benchLineNoteHtml+rangeNoteHtml+'</div>'+
-      predictionNoteHtml+
-      (iMode==='price' ? '' : '<button class="chart-mode-toggle" data-twin-reset="'+idx+'" hidden>↺ 기준점 초기화</button>')+
-      '<div class="twin-chart-wrap"><canvas data-twin-canvas="'+idx+'"></canvas></div>'+
-      (hasDrawableEpisodes ? gapEpisodesCaptionHtml(t.overlapYms, episodes) : '')+
-      ratioLine(t)+
-      '<div class="twin-msg easy-summary">'+easyOf(t, fair)+'</div>'+
-      wrapDetail(detailOf(t))+
-      '<button class="view-multi-btn" data-twin-view="'+idx+'">📊 여러 단지 비교에서 보기</button>'+
-    '</div>';
+    return sectionDividerHtml + buildTwinCardHtml(t, idx, comp, r, bestFairPriceCandidate, itemModeOf(t), itemRangeModeOf(t), itemShowBenchOf(t));
   }).join('') + moreBtnHtml + (moreOpen && totalRestPages > 1 ? renderTwinPageNav(page, totalRestPages, 'twin') : '');
-  const benchForGapHistory = getVirtualBenchmarkComplex('seoul');
   pagedAllItems.forEach((t, idx) => {
-    const iMode = itemModeOf(t);
-    const iRangeMode = itemRangeModeOf(t);
-    const iShowBench = itemShowBenchOf(t);
-    const itemKey = itemOverrideKey(key, t.name);
-    const canvas = body.querySelector('[data-twin-canvas="'+idx+'"]');
-    const fair = isBestFairPrice(t) ? computeFairPriceEstimate(comp, t) : null;
-    const fairIndexVal = fair ? fairPriceToIndexValue(comp, t.overlapYms, fair.fairPrice) : null;
-    const episodes = t.matchType === 'closed' ? t.gapStats.episodes : null;
-    if (canvas){
-      const chart = new Chart(canvas, twinMiniChartConfig(comp, t.complex, t.name, t.overlapYms, iMode, predictionMonthsOf(t), clsOf(t), fairIndexVal, episodes, t.decoupling, iShowBench, benchForGapHistory, iRangeMode));
-      // 항목 4(2026-09 세션) — refMiniChartConfig(준거단지)에 있던 "클릭해서
-      // 기준점 재설정" 기능을 쌍둥이/갭메우기 미니차트에도 동일하게 붙인다.
-      // 예측/적정가 점선은 twinMiniChartConfig가 noRebase:true로 표시해둬서
-      // wireChartRebase가 자동으로 재계산 대상에서 제외하고, 선도단지 선은
-      // 일반 실측 데이터셋이라 그대로 재계산 대상에 포함된다(항목 4 재확인
-      // 사항 — 아래 라이브 검증에서 실제로 확인).
-      if (iMode !== 'price') wireChartRebase(chart, canvas, body.querySelector('[data-twin-reset="'+idx+'"]'));
-    }
-    const viewBtn = body.querySelector('[data-twin-view="'+idx+'"]');
-    if (viewBtn) viewBtn.addEventListener('click', () => handleViewMultiClick(comp.name, t.name, viewBtn));
-    const itemModeBtn = body.querySelector('[data-item-mode-toggle="'+idx+'"]');
-    if (itemModeBtn) itemModeBtn.addEventListener('click', () => {
-      cardChartModeOverride.set(itemKey, iMode === 'index' ? 'price' : 'index');
-      renderTwinBody(body, comp, r, key);
-    });
-    const itemRangeBtn = body.querySelector('[data-item-range-toggle="'+idx+'"]');
-    if (itemRangeBtn) itemRangeBtn.addEventListener('click', () => {
-      cardRangeModeOverride.set(itemKey, iRangeMode === 'overlap' ? 'full' : 'overlap');
-      renderTwinBody(body, comp, r, key);
-    });
-    const itemBenchBtn = body.querySelector('[data-item-bench-toggle="'+idx+'"]');
-    if (itemBenchBtn) itemBenchBtn.addEventListener('click', () => {
-      cardBenchLineOverride.set(itemKey, !iShowBench);
-      renderTwinBody(body, comp, r, key);
-    });
+    wireOneTwinCard(body, t, idx, comp, r, bestFairPriceCandidate, itemModeOf(t), itemRangeModeOf(t), itemShowBenchOf(t), itemOverrideKey(key, t.name), () => renderTwinBody(body, comp, r, key, hideTopPreview));
   });
   const modeBtn = body.querySelector('[data-chart-mode-toggle]');
   if (modeBtn){
@@ -3780,7 +3822,7 @@ function renderTwinBody(body, comp, r, key){
       // 전역 토글은 "일괄 전환"이라 개별로 바꿔둔 카드 오버라이드를 지운다 —
       // 이후 다시 개별로 바꾸면 그 카드만 새로 전역과 독립적으로 유지된다.
       clearOverridesForSection(cardChartModeOverride, key);
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, hideTopPreview);
     });
   }
   const rangeModeBtn = body.querySelector('[data-range-mode-toggle]');
@@ -3788,7 +3830,7 @@ function renderTwinBody(body, comp, r, key){
     rangeModeBtn.addEventListener('click', () => {
       rangeModeState.set(key, rangeMode === 'overlap' ? 'full' : 'overlap');
       clearOverridesForSection(cardRangeModeOverride, key);
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, hideTopPreview);
     });
   }
   const moreBtn = body.querySelector('[data-twin-more]');
@@ -3796,17 +3838,42 @@ function renderTwinBody(body, comp, r, key){
     moreBtn.addEventListener('click', () => {
       twinMoreOpen.add(key);
       twinPageState.set(key, 1);
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, hideTopPreview);
     });
   }
   if (moreOpen && totalRestPages > 1){
     body.querySelectorAll('[data-twin-page]').forEach(btn => {
       btn.addEventListener('click', () => {
         twinPageState.set(key, Number(btn.dataset.twinPage));
-        renderTwinBody(body, comp, r, key);
+        renderTwinBody(body, comp, r, key, hideTopPreview);
       });
     });
   }
+}
+// 항목(2026-09-21 세션, "실측 케이스 칸1/2 미리보기") — 실측 동조율
+// 카드(칸1 진단분석/칸2 동조율)는 준거단지 그래프가 없는 대신, 추정
+// 케이스의 renderEstSplitRefs와 정확히 같은 패턴으로 쌍둥이 단지 "닮은꼴
+// 1위"(diagEl)와 "현재괴리 1위"(syncEl)를 각각 1장씩 미리보기로 보여준다.
+// renderTwinBody의 previewLimit 규칙(닮은꼴1+괴리1)과 완전히 같은 후보를
+// 뽑아 buildTwinCardHtml/wireOneTwinCard를 그대로 재사용한다 — 카드
+// 템플릿·차트·토글 로직이 목록 렌더링과 완전히 동일하게 유지된다.
+function renderTwinSplitPreview(diagEl, syncEl, comp, r, key){
+  const { curated: rawCurated, bestFairPriceCandidate } = findTwinCandidates(comp);
+  const curated = rawCurated.filter(t => t.matchType !== 'closed');
+  const previewSimilar = curated.filter(t => t.matchType === 'similar').slice(0, 1)[0] || null;
+  const previewGap = curated.filter(t => t.matchType === 'gap').slice(0, 1)[0] || null;
+  function renderOne(el, t){
+    if (!el) return;
+    if (!t){ el.innerHTML = ''; return; }
+    const itemKey = itemOverrideKey(key, t.name);
+    const iMode = cardChartModeOverride.get(itemKey) || (chartModeState.get(key) || 'index');
+    const iRangeMode = cardRangeModeOverride.get(itemKey) || (rangeModeState.get(key) || 'overlap');
+    const iShowBench = cardBenchLineOverride.has(itemKey) ? cardBenchLineOverride.get(itemKey) : false;
+    el.innerHTML = buildTwinCardHtml(t, 0, comp, r, bestFairPriceCandidate, iMode, iRangeMode, iShowBench);
+    wireOneTwinCard(el, t, 0, comp, r, bestFairPriceCandidate, iMode, iRangeMode, iShowBench, itemKey, () => renderOne(el, t));
+  }
+  renderOne(diagEl, previewSimilar);
+  renderOne(syncEl, previewGap);
 }
 // 실측 동조율 카드는 부모 테이블 행(diag-detail-row)이나 다중비교/단일진단
 // 탭(shell-body[hidden])이 처음부터 닫혀 있어도 쌍둥이 단지 섹션을 기본
@@ -3830,18 +3897,20 @@ function wireTwinToggle(container, comp, r){
   const body = container.querySelector('[data-twin-body="'+key+'"]');
   if (!body) return;
   // 단일단지 진단 화면 + 패널 모드(넓은 화면)에서는 인라인 펼침 대신 우측
-  // 패널로 보낸다(2026-09-17 세션, 항목 2). 실측 동조율 카드의 기본 펼침
-  // (openTwinRows 강제 추가, 2026-09 세션 항목 2)은 패널 모드에서는 적용하지
-  // 않는다 — 동조율/쌍둥이 두 섹션이 동시에 기본 펼침 대상이라 패널(한 번에
-  // 하나만 보여줌)에 뭘 먼저 띄울지 애매해지고, "토글을 누르면 열린다"는
-  // 패널 UX 자체가 클릭을 전제로 하므로 패널 모드에서는 처음엔 접혀 있고
-  // 클릭해야 열리는 쪽이 더 일관적이다. 좁은 화면(기존 인라인 방식)에서는
-  // 이 기본 펼침을 그대로 유지한다.
+  // 패널로 보낸다(2026-09-17 세션, 항목 2) — "토글을 누르면 열린다"는 패널
+  // UX 자체가 클릭을 전제로 하므로 패널 모드에서는 처음엔 접혀 있고
+  // 클릭해야 열리는 쪽이 일관적이다.
+  // 항목(2026-09-21 세션, "실측 케이스 칸1/2 미리보기") — 단일진단
+  // 화면에서는 닮은꼴1위/현재괴리1위를 칸1/칸2에 이미 미리보기로 보여주므로
+  // (renderTwinSplitPreview), 이 버튼이 여는 본문에서는 그 2장을 다시
+  // 보여주지 않는다 — renderTwinBody의 hideTopPreview 인자로 전달한다.
+  // 다중비교 탭(inSingleDiag=false)은 이 인자가 false라 기존처럼 본문
+  // 안에 닮은꼴1위/현재괴리1위가 그대로 포함된다.
   const inSingleDiag = !!btn.closest('#singleDiagSection');
   function ensureRendered(){
     if (!body.dataset.rendered){
       body.dataset.rendered = '1';
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, inSingleDiag);
     }
   }
   function openInline(){
@@ -3849,7 +3918,7 @@ function wireTwinToggle(container, comp, r){
     body.style.display = '';
     if (!body.dataset.rendered){
       body.dataset.rendered = '1';
-      runWhenElementVisible(body, () => renderTwinBody(body, comp, r, key));
+      runWhenElementVisible(body, () => renderTwinBody(body, comp, r, key, inSingleDiag));
     }
   }
   if (openTwinRows.has(key)){
@@ -3878,7 +3947,7 @@ function wireTwinToggle(container, comp, r){
     btn.classList.toggle('open', nowOpen);
     body.style.display = nowOpen ? '' : 'none';
     if (nowOpen && !body.dataset.rendered){
-      renderTwinBody(body, comp, r, key);
+      renderTwinBody(body, comp, r, key, inSingleDiag);
       body.dataset.rendered = '1';
     }
   });
@@ -4926,14 +4995,22 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
         '</div>'+
       '</div>';
   } else if (sync && sync.benchmarkGroupKey === 'rebuild'){
-    // 재건축 벤치마크는 구성단지 변동성이 커서 등급화를 보류한다 — 수치는
-    // 참고용으로 그대로 보여주되, 높음/보통/낮음 배지와 동조율 기반 해석은 붙이지 않는다.
+    // 재건축 벤치마크는 구성단지 변동성이 커서 배지의 높음/보통/낮음 등급
+    // 판정 자체는 보류한다(benchmarkSyncTier가 groupKey==='rebuild'에는
+    // 항상 null을 돌려주도록 유지) — 수치는 참고용으로만 보여준다. 다만
+    // 5단계 구간표(아주나쁨~아주좋음)는 일반 단지와 같은 화면 구성으로
+    // 맞춰달라는 요청(2026-09-21 세션)으로, syncTierRangeHtml에 groupKey를
+    // 실제 값(rebuild, 내부에서 필터링돼 안 그려짐) 대신 'seoul'로 고정
+    // 전달해 서울 일반 경계값(SYNC_TIER_BOUNDS)을 그대로 재사용한 구간표를
+    // 그린다 — 재건축 전용 경계값 재산정은 이번 범위 밖(요청사항). 배지
+    // 자체와 바로 아래 경고 문구로 "참고용"이라는 것을 계속 명시한다.
     syncHtml =
       '<div class="sync-block">'+
         '<div class="sync-head">'+
           '<span class="k">동조율 <span class="info-icon" tabindex="0" data-tip="'+esc(SYNC_TOOLTIP)+'">ⓘ</span></span>'+
           '<span class="sync-badge tier-none">'+sync.rate.toFixed(1)+'% (참고용)</span>'+
         '</div>'+
+        syncTierRangeHtml(sync.compCycle.rise, 'seoul')+
         '<div class="easy-summary">재건축 대표단지라 변동성이 커서 참고만 하세요.</div>'+
         wrapDetail(fmtYm(sync.compCycle.low.ym)+'(저점) → '+fmtYm(sync.compCycle.high.ym)+'(고점), '+(sync.compCycle.rise>=0?'+':'')+sync.compCycle.rise.toFixed(1)+'%<br>재건축 선도단지는 개별 단지 변동성이 커서 동조율 등급 판정에는 참고용으로만 활용해주세요.')+
         (baseCompareHtml||'')+
@@ -4961,6 +5038,12 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
         '<div class="easy-summary">'+esc(realSyncInterpText || SYNC_EASY_SUMMARY[sync.tier] || '')+'</div>'+
         wrapDetail(fmtYm(sync.compCycle.low.ym)+'(저점) → '+fmtYm(sync.compCycle.high.ym)+'(고점), '+(sync.compCycle.rise>=0?'+':'')+sync.compCycle.rise.toFixed(1)+'% · 동조율 '+sync.rate.toFixed(1)+'%(참고)'+(ratioDetailText?'<br>'+esc(ratioDetailText):'')+(interp?' '+esc(interp):''))+
         (baseCompareHtml||'')+
+        // 항목(2026-09-21 세션, "실측 케이스 칸1/2 미리보기") — 준거단지
+        // 개념이 없는 실측 동조율 카드는 이 자리에 쌍둥이 단지 "현재괴리
+        // 1위"를 보여준다(renderTwinSplitPreview가 직접 채운다). 다중비교
+        // 탭에서는 칸1/2 개념 자체가 없어 이 빈 컨테이너가 그냥 아무 내용
+        // 없이 남는다 — inlineSyncCard(단일진단)일 때만 넣는다.
+        (inlineSyncCard ? '<div class="twin-body" data-twin-sync-preview="1"></div>' : '')+
       '</div>';
   } else {
     syncHtml =
@@ -5046,11 +5129,19 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   // 참조해야 해서 그 계산을 이 앞으로 옮겼다.
   const compRatioStats = computeSelfRatioStats(comp);
   const compEligibility = jeonseRatioDiagnosisEligible(findBuiltYear(comp.name), compRatioStats, state.threshold);
+  // 항목(2026-09-21 세션, "재건축 단지 전세가율 구조적 해석 제외") —
+  // jeonseRatioStructuralNote는 "전세가율이 낮다 = 매매가가 실수요 대비
+  // 앞서 있다(고평가 쪽 신호)"는 일반 단지 논리인데, 재건축 단지는
+  // 멸실·이주가 임박해 전세 수요 자체가 구조적으로 낮아지는 게 정상이라
+  // 이 논리를 그대로 적용하면 잘못된 해석이 된다. comp.isVirtualBenchmark
+  // (선도단지 자기 자신 카드)는 재건축 판정 대상이 아니라 pickBenchGroupForTarget이
+  // 어차피 'seoul'로 안전하게 폴백한다.
+  const compIsRebuild = pickBenchGroupForTarget(comp.name).groupKey === 'rebuild';
   const jeonseHistoryHtml = compRatioStats
     ? '<div class="stat-row"><span class="k">현재 전세가율</span><span class="v">'+fmtPct(compRatioStats.cur)+'</span></div>'+
       '<div class="stat-row"><span class="k">역사적 평균 전세가율</span><span class="v">'+fmtPct(compRatioStats.avg)+'</span></div>'+
       '<div class="stat-row"><span class="k">역사적 최저 전세가율</span><span class="v">'+fmtPct(compRatioStats.minVal)+' ('+fmtYm(compRatioStats.minYm)+')</span></div>'+
-      '<div class="card-msg" style="margin-top:2px;">'+esc(jeonseRatioStructuralNote(compRatioStats))+'</div>'
+      '<div class="jeonse-structural-note" style="margin-top:2px;">'+esc(compIsRebuild ? '재건축 단지는 멸실·이주 임박으로 전세 수요가 구조적으로 낮아질 수 있어, 전세가율로 가격 수준을 판단하기 어렵습니다.' : jeonseRatioStructuralNote(compRatioStats))+'</div>'
     : '';
   const jeonseStatsHtml =
     '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균) '+ratioTips.jeonseRatio+'</span><span class="v">'+fmtPct(activeR.currentJeonseRatio)+' / '+fmtPct(activeR.avgJeonseRatio)+'</span></div>'+
@@ -5069,23 +5160,23 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   // 상속값을 덮어쓴다 — 의도된 결과, 기존 박스와 동일한 글자 크기로 맞춰짐).
   const msgHtml = '<div class="card-msg easy-summary fair-price-summary-card tone-'+headlineDiag.tone+'"><div class="fair-price-summary-body">'+esc(unifiedSummary || headlineDiag.easyMessage||headlineDiag.message)+'</div></div>'+wrapDetail(activeR.diag.message+' '+ratioSentence);
   const twinKey = 'twin-'+kTag+'-'+i;
-  // 실측 동조율 카드는 처음 렌더링될 때만 쌍둥이 단지 섹션을 기본 펼침하고
-  // 기본 노출을 제한한다 — 이미 기본값을 적용한 적 있으면(twinDefaultOpened)
-  // 사용자가 수동으로 접었을 수도 있으므로 다시 강제로 펴지 않는다. "단지 1개
-  // 진단" 탭은 슬롯 키(twin-s-0)가 고정이라 다른 단지로 바꿔도 같은 키를
-  // 재사용하므로, 추정(estimate) 단지로 바뀌면 이전 실측 단지에서 남은
-  // previewLimit이 새어들지 않도록 명시적으로 지운다.
+  // "단지 1개 진단" 탭은 슬롯 키(twin-s-0)가 고정이라 다른 단지로 바꿔도
+  // 같은 키를 재사용하므로, 추정(estimate) 단지로 바뀌면 이전 실측 단지에서
+  // 남은 previewLimit이 새어들지 않도록 명시적으로 지운다.
   // 항목(2026-09 세션, "쌍둥이 단지 축소") — 예전엔 상위 N개를 상관계수
   // 순으로 그냥 슬라이스했는데(previewLimit=3), curated가 갭메우기/닮은꼴/
-  // 괴리를 섞어 정렬한 배열이라 타입 구성이 들쭉날쭉했다. 이제 renderTwinBody가
+  // 괴리를 섞어 정렬한 배열이라 타입 구성이 들쭉날쭉했다. renderTwinBody가
   // "닮은꼴 1 + 현재괴리 1"을 타입별로 명시적으로 뽑으므로, 여기서는 개수가
   // 아니라 "제한 모드 사용 여부"만 불리언으로 표시한다.
+  // 항목(2026-09-21 세션, "실측 케이스 칸1/2 미리보기") — 예전엔 실측
+  // 동조율 카드를 처음 만날 때 "쌍둥이 단지 보기" 섹션을 강제로 기본
+  // 펼침해서 그 안에 닮은꼴1위/현재괴리1위를 곧바로 보여줬는데, 이제 그
+  // 두 장은 단일진단 칸1/칸2에 renderTwinSplitPreview로 상시 노출되므로
+  // (다중비교 탭은 이 미리보기 개념이 없어 여전히 접힌 채 시작), 이 버튼도
+  // 다른 "더 보기"류 버튼들과 같이 기본은 접힌 상태에서 시작해 일관성을
+  // 맞춘다 — 강제 펼침 로직(twinDefaultOpened)은 제거한다.
   if (isRealSyncCase){
     twinPreviewLimit.set(twinKey, true);
-    if (!twinDefaultOpened.has(twinKey)){
-      openTwinRows.add(twinKey);
-      twinDefaultOpened.add(twinKey);
-    }
   } else {
     twinPreviewLimit.delete(twinKey);
   }
@@ -5141,9 +5232,14 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
     // forceInline 없이 호출해 원래의 inSingleDiag+패널 라우팅을 되살린다.
     // 준거단지 1위 자리 — 실측 사이클이 없는 준신축(estimate 케이스)에서만
     // 채워진다(renderEstSplitRefs가 [data-est-diag-ref] 컨테이너에 직접
-    // 그린다). 실측 사이클이 있는 단지는 애초에 준거단지 개념이 없어 빈
-    // 문자열 그대로 둔다.
-    const diagRefPlaceholder = (estimate && estimate.estimated) ? '<div class="twin-body" data-est-diag-ref="1"></div>' : '';
+    // 그린다). 항목(2026-09-21 세션, "실측 케이스 칸1/2 미리보기") — 실측
+    // 동조율이 있는 케이스(재건축 제외)는 준거단지 대신 쌍둥이 단지
+    // "닮은꼴 1위"를 같은 자리에 보여준다(renderTwinSplitPreview가
+    // [data-twin-diag-preview] 컨테이너에 직접 그린다). 재건축은 동조율
+    // 등급화 자체를 보류하는 별개 취급이라(isRealSyncCase가 이미 rebuild를
+    // 제외) 이 미리보기 대상에서도 빠진다 — 이번 범위 밖.
+    const diagRefPlaceholder = (estimate && estimate.estimated) ? '<div class="twin-body" data-est-diag-ref="1"></div>'
+      : (isRealSyncCase ? '<div class="twin-body" data-twin-diag-preview="1"></div>' : '');
     const diagColHtml = '<div class="card single-diag-subcard single-diag-col-diag"><div class="sync-head"><span class="k">📊 진단분석</span></div>'+saleStatsHtml+msgHtml+diagRefPlaceholder+'</div>';
     const syncColHtml = '<div class="card single-diag-subcard single-diag-col-sync">'+syncHtml+'</div>';
     const singleAdvancedBody = jeonseStatsHtml + hedgeHtml + (benchStatusHtml||'');
@@ -5496,6 +5592,17 @@ function renderSingleDiag(name){
     const syncRefEl = card.querySelector('[data-est-top-body]');
     const estKey = syncRefEl ? syncRefEl.dataset.estTopBody : ('est-s-0');
     renderEstSplitRefs(diagRefEl, syncRefEl, target, estimate, estKey);
+  }
+  // 항목(2026-09-21 세션, "실측 케이스 칸1/2 미리보기") — 준거단지 카드가
+  // 없는 실측 동조율 케이스(재건축 제외)는 같은 자리에 쌍둥이 단지
+  // 닮은꼴1위/현재괴리1위를 즉시 렌더링한다. 두 컨테이너가 모두 없으면
+  // (추정/재건축 케이스) findTwinCandidates를 불필요하게 호출하지 않도록
+  // 가드한다.
+  const twinDiagPreviewEl = card.querySelector('[data-twin-diag-preview]');
+  const twinSyncPreviewEl = card.querySelector('[data-twin-sync-preview]');
+  if (twinDiagPreviewEl || twinSyncPreviewEl){
+    const twinBtn = card.querySelector('[data-twin-toggle]');
+    if (twinBtn) renderTwinSplitPreview(twinDiagPreviewEl, twinSyncPreviewEl, target, r, twinBtn.dataset.twinToggle);
   }
   wireEstDetailToggle(card, target, estimate, { skipTopRender: true, skipCount: 2 });
   wireBenchStatusCharts(card, bench, target);
