@@ -31,6 +31,7 @@
   .complex-card .badges{ display:flex; gap:3px; flex-wrap:nowrap; }
   .badge{ display:inline-block; padding:1px 5px; border-radius:8px; font-size:9px; background:var(--badge-bg); color:var(--badge-text); white-space:nowrap; }
   .badge.badge-price{ background:var(--base-color); color:#fff; font-weight:700; }
+  .badge.badge-pyeong{ background:#fff3e0; color:#e65100; }
   .complex-card.role-base{ border-color:var(--base-color); box-shadow:0 0 0 1px var(--base-color) inset; }
   .complex-card.role-compare{ border-color:var(--compare-color); box-shadow:0 0 0 1px var(--compare-color) inset; }
   .complex-card .role-badge{ display:none; font-size:9px; font-weight:700; margin-top:2px; }
@@ -365,16 +366,36 @@ function ageBadgeText(builtYear){
   return builtYear + '년';
 }
 
+// 급지표의 시세는 전 단지가 국민평형(84형, 전용 84㎡대)을 기준으로
+// 비교된다. 공급면적 기준 평형(pyeongType)은 단지별 전용률(공급 대비
+// 전용면적 비율)에 따라 31~38평까지 폭넓게 흩어지므로, 공급평형만으로
+// "다른 평형"이라 단정하면 실제로는 84형인데도 배지가 뜨는 오탐이
+// 나온다(2026-09 세션 실측: 광명역써밋플레이스 37평·광명두산위브
+// 트레지움 36평도 전용면적은 84㎡대). 그래서 31~38평 구간은 전용면적이
+// 84형 범위(81~86㎡)인지 한 번 더 확인하고, 84형이 맞으면 배지를
+// 띄우지 않는다. 31~38평 밖이면 전용면적을 볼 것도 없이 84형이 아니므로
+// 바로 배지를 띄운다. (81~86㎡ 범위는 2026-09 세션에서 장미(1차)/(2차)
+// 82.45㎡, 반포센트레빌아스테리움 82.01㎡처럼 84형과 사실상 같게 보는
+// 경계 사례를 반영해 83~86㎡에서 넓힌 것 — 사용자 확인 완료.)
+function pyeongBadgeText(pyeongType, exclusiveArea){
+  if (pyeongType == null) return null;
+  const maybeStandard = pyeongType >= 31 && pyeongType <= 38;
+  if (maybeStandard && exclusiveArea != null && exclusiveArea >= 81 && exclusiveArea <= 86) return null;
+  return pyeongType + '평';
+}
+
 function cardHtml(complex, priceLabel){
   const role = roleOf(complex.id);
   const roleClass = role ? ' role-'+role : '';
   const roleLabel = role === 'base' ? '기준단지' : role === 'compare' ? '비교단지' : '';
   const ageBadge = '<span class="badge">'+esc(ageBadgeText(complex.builtYear))+'</span>';
   const unitsBadge = '<span class="badge">'+esc(complex.units!=null ? complex.units+'세대' : '정보없음')+'</span>';
+  const pyeongText = pyeongBadgeText(complex.pyeongType, complex.exclusiveArea);
+  const pyeongBadge = pyeongText!=null ? '<span class="badge badge-pyeong">'+esc(pyeongText)+'</span>' : '';
   const priceBadge = priceLabel!=null ? '<span class="badge badge-price">'+priceLabel.toFixed(1)+'억</span>' : '';
   return '<div class="complex-card'+roleClass+'" data-id="'+esc(complex.id)+'">' +
     '<div class="name">'+esc(displayName(complex))+'</div>' +
-    '<div class="badges">'+ageBadge+unitsBadge+priceBadge+'</div>' +
+    '<div class="badges">'+ageBadge+unitsBadge+pyeongBadge+priceBadge+'</div>' +
     '<div class="role-badge">'+esc(roleLabel)+'</div>' +
     '</div>';
 }
@@ -569,7 +590,7 @@ function renderDataMonth(){
   if (!el) return;
   if (latestYm == null){ el.textContent = ''; return; }
   const y = Math.floor(latestYm / 100), m = latestYm % 100;
-  el.textContent = '기준월: ' + y + '년 ' + m + '월';
+  el.textContent = '기준월: ' + y + '년 ' + m + '월 / 31~34평 국민평형 기준 81~86㎡ 기준';
 }
 
 function init(){
