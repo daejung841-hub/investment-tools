@@ -319,8 +319,23 @@ textarea{
    CSS로만 반응형 처리한다 — 이 둘은 항상 보이는 콘텐츠라 "패널로 숨길지"
    판단이 필요 없어서다. */
 .single-diag-row{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}
-.single-diag-sync-card{flex:1 1 380px;min-width:300px;}
-.single-diag-card{flex:1 1 560px;max-width:640px;}
+/* 항목(2026-09 세션, "단일진단 레이아웃 재구성" — 진단분석/동조율/쌍둥이
+   단지 3칸) — single-diag-wrap의 최대 폭이 1500px라(사이드바 없음, 실측
+   확인) 넓은 화면에서 3칸이 나란히 놓여도 여유가 있다. 각 칸은 자기
+   .card 박스를 갖고, 이걸 담는 바깥(single-diag-body)은 테두리 없는 순수
+   레이아웃 컨테이너다. 쌍둥이 단지 칸은 미니 차트가 들어가 다른 두 칸보다
+   조금 더 넓게 잡는다. */
+.single-diag-body{display:flex;flex-direction:column;gap:16px;width:100%;}
+.single-diag-cols{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}
+.single-diag-col-diag, .single-diag-col-sync{flex:1 1 360px;min-width:300px;}
+/* 항목(2026-09 세션, "쌍둥이/심화분석 버튼 나란히 배치") — 칸3은 이제
+   버튼 2개만 담아 다른 두 칸보다 좁아도 된다. 버튼 자체는 내부 flex 행
+   (single-diag-action-row)으로 나란히 놓고, 패널 모드가 아닌 좁은 화면에서
+   둘 중 하나를 펼치면 그 버튼 아래로만 내용이 늘어난다(옆 버튼과 서로
+   안 밀림). */
+.single-diag-col-actions{flex:1 1 280px;min-width:260px;}
+.single-diag-action-row{display:flex;gap:12px;align-items:flex-start;}
+.single-diag-action-row > .twin-section, .single-diag-action-row > .more-section{flex:1 1 0;min-width:0;}
 .bench-status-card{max-width:640px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
 /* 항목 3(2026-09-20 세션) — "전세가율 자기이탈" 그래프가 "안 보인다"는
    재확인을 받아 재조사했다: Chart.js 인스턴스는 정상 생성되고 데이터도
@@ -639,13 +654,6 @@ textarea{
    실제 값 범위(예: +400%~-100%)와 무관하게 컨테이너/캔버스 크기로만
    정해지는 값이라 항상 동일하게 유지된다. */
 .twin-chart-wrap{height:385px;position:relative;}
-/* 단일진단 핵심의 "닮은꼴 1위" 미리보기(2026-09 세션, 시안 B) — 흥미유발용
-   요소라 풀 카드보다 낮은 높이로 가볍게 보여준다. 클릭/키보드로 심화분석을
-   여는 상호작용 요소라 role="button"에 맞춰 hover/focus 표시를 준다. */
-.twin-preview{cursor:pointer;border:1px solid var(--border);border-radius:10px;padding:8px 10px 4px;}
-.twin-preview:hover, .twin-preview:focus-visible{border-color:var(--info);outline:none;}
-.twin-preview .twin-chart-wrap{height:180px;}
-.twin-preview-caption{font-size:12.5px;color:var(--ink-muted);text-align:center;margin-top:2px;}
 /* 항목(2026-09-19 세션, 여러 라운드에 걸쳐 다듬음) — Chart.js 데이터포인트
    툴팁을 커스텀 렌더링(external 콜백)으로 대체한 박스. 처음엔 차트 밖
    완전히 별도 위치로 뺐다가, 그래프와 너무 떨어져 보인다는 피드백으로
@@ -868,7 +876,6 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
             <button class="btn small fair-cta" id="singleBenchmarkOverlayToggle">🏙️ 선도단지 표시</button>
             <select class="btn small" id="singleBenchmarkOverlaySelect">
               <option value="seoul">서울 선도단지(일반)</option>
-              <option value="rebuild">서울 선도단지(재건축)</option>
             </select>
           </div>
         </div>
@@ -989,7 +996,6 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
               <button class="btn small fair-cta" id="benchmarkOverlayToggle">🏙️ 선도단지 표시</button>
               <select class="btn small" id="benchmarkOverlaySelect">
                 <option value="seoul">서울 선도단지(일반)</option>
-                <option value="rebuild">서울 선도단지(재건축)</option>
               </select>
             </div>
           </div>
@@ -3528,7 +3534,7 @@ function fairPriceInterpretation(twinName, fair, curSalePrice){
   const diffPct = curSalePrice!=null ? (fair.fairPrice - curSalePrice) / curSalePrice * 100 : null;
   return ' '+withParticle(twinName, '과', '와')+'의 역사적 관계가 맞다면, 이 단지의 적정가는 약 '+fmtEok(fair.fairPrice)+' 수준으로 추정됩니다'+(diffPct!=null ? ' (현재가 대비 '+(diffPct>=0?'+':'')+diffPct.toFixed(1)+'% 차이)' : '')+'.';
 }
-function renderTwinBody(body, comp, r, key, excludeNames){
+function renderTwinBody(body, comp, r, key){
   const { curated: rawCurated, rest: rawRest, bestFairPriceCandidate } = findTwinCandidates(comp);
   // 항목(2026-09 세션, "갭메우기 이력 UI 숨김") — 계산 레이어(closed 분류,
   // gapStats, historicalGapEpisodes)는 findTwinCandidates 안에 그대로 두고,
@@ -3536,13 +3542,8 @@ function renderTwinBody(body, comp, r, key, excludeNames){
   // 예측 점선은 둘 다 matchType==='closed'에만 종속돼 있어(isBestFairPrice/
   // predictionMonthsOf 참고) 이 필터 하나로 자동으로 함께 꺼진다 — 재활성화가
   // 필요해지면 이 두 줄만 되돌리면 된다.
-  // excludeNames(2026-09 세션, "단일진단 정보위계 재구성" 시안 B) — 핵심에
-  // 이미 미리보기로 보여준 "닮은꼴 1위"를 심화분석의 쌍둥이 단지 상세에서
-  // 또 보여주면 중복이라, 그 이름만 여기서 한 번 더 걸러낸다(다중비교
-  // 탭에서는 항상 undefined라 영향 없음).
-  const notExcluded = t => !excludeNames || !excludeNames.has(t.name);
-  const curated = rawCurated.filter(t => t.matchType !== 'closed' && notExcluded(t));
-  const rest = rawRest.filter(t => t.matchType !== 'closed' && notExcluded(t));
+  const curated = rawCurated.filter(t => t.matchType !== 'closed');
+  const rest = rawRest.filter(t => t.matchType !== 'closed');
   if (!curated.length && !rest.length){
     body.innerHTML = '<div class="twin-msg">상관계수 '+TWIN_CORR_THRESHOLD.toFixed(2)+' 이상인 쌍둥이 단지를 찾지 못했습니다.</div>';
     return;
@@ -3721,17 +3722,17 @@ function renderTwinBody(body, comp, r, key, excludeNames){
     const itemModeBtn = body.querySelector('[data-item-mode-toggle="'+idx+'"]');
     if (itemModeBtn) itemModeBtn.addEventListener('click', () => {
       cardChartModeOverride.set(itemKey, iMode === 'index' ? 'price' : 'index');
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
     });
     const itemRangeBtn = body.querySelector('[data-item-range-toggle="'+idx+'"]');
     if (itemRangeBtn) itemRangeBtn.addEventListener('click', () => {
       cardRangeModeOverride.set(itemKey, iRangeMode === 'overlap' ? 'full' : 'overlap');
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
     });
     const itemBenchBtn = body.querySelector('[data-item-bench-toggle="'+idx+'"]');
     if (itemBenchBtn) itemBenchBtn.addEventListener('click', () => {
       cardBenchLineOverride.set(itemKey, !iShowBench);
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
     });
   });
   const modeBtn = body.querySelector('[data-chart-mode-toggle]');
@@ -3741,7 +3742,7 @@ function renderTwinBody(body, comp, r, key, excludeNames){
       // 전역 토글은 "일괄 전환"이라 개별로 바꿔둔 카드 오버라이드를 지운다 —
       // 이후 다시 개별로 바꾸면 그 카드만 새로 전역과 독립적으로 유지된다.
       clearOverridesForSection(cardChartModeOverride, key);
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
     });
   }
   const rangeModeBtn = body.querySelector('[data-range-mode-toggle]');
@@ -3749,7 +3750,7 @@ function renderTwinBody(body, comp, r, key, excludeNames){
     rangeModeBtn.addEventListener('click', () => {
       rangeModeState.set(key, rangeMode === 'overlap' ? 'full' : 'overlap');
       clearOverridesForSection(cardRangeModeOverride, key);
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
     });
   }
   const moreBtn = body.querySelector('[data-twin-more]');
@@ -3757,14 +3758,14 @@ function renderTwinBody(body, comp, r, key, excludeNames){
     moreBtn.addEventListener('click', () => {
       twinMoreOpen.add(key);
       twinPageState.set(key, 1);
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
     });
   }
   if (moreOpen && totalRestPages > 1){
     body.querySelectorAll('[data-twin-page]').forEach(btn => {
       btn.addEventListener('click', () => {
         twinPageState.set(key, Number(btn.dataset.twinPage));
-        renderTwinBody(body, comp, r, key, excludeNames);
+        renderTwinBody(body, comp, r, key);
       });
     });
   }
@@ -3784,7 +3785,7 @@ function runWhenElementVisible(el, fn){
   });
   obs.observe(document.body, { attributes:true, subtree:true, attributeFilter:['style','class','hidden'] });
 }
-function wireTwinToggle(container, comp, r, excludeNames){
+function wireTwinToggle(container, comp, r){
   const btn = container.querySelector('[data-twin-toggle]');
   if (!btn) return;
   const key = btn.dataset.twinToggle;
@@ -3802,7 +3803,7 @@ function wireTwinToggle(container, comp, r, excludeNames){
   function ensureRendered(){
     if (!body.dataset.rendered){
       body.dataset.rendered = '1';
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
     }
   }
   function openInline(){
@@ -3810,7 +3811,7 @@ function wireTwinToggle(container, comp, r, excludeNames){
     body.style.display = '';
     if (!body.dataset.rendered){
       body.dataset.rendered = '1';
-      runWhenElementVisible(body, () => renderTwinBody(body, comp, r, key, excludeNames));
+      runWhenElementVisible(body, () => renderTwinBody(body, comp, r, key));
     }
   }
   if (openTwinRows.has(key)){
@@ -3839,7 +3840,7 @@ function wireTwinToggle(container, comp, r, excludeNames){
     btn.classList.toggle('open', nowOpen);
     body.style.display = nowOpen ? '' : 'none';
     if (nowOpen && !body.dataset.rendered){
-      renderTwinBody(body, comp, r, key, excludeNames);
+      renderTwinBody(body, comp, r, key);
       body.dataset.rendered = '1';
     }
   });
@@ -4111,11 +4112,15 @@ function handleViewMultiClick(baseName, compName, originEl){
     viewComplexPairInMultiCompare(baseName, compName);
   }
 }
-function renderEstDetailBody(body, comp, estimate, key){
+function renderEstDetailBody(body, comp, estimate, key, skipCount){
   const references = (estimate && estimate.references) || [];
   // 1~3위 준거단지는 카드 요약(항상 보이는 영역)에서 이미 보여주므로, 여기선
   // 4위부터만 다룬다(2026-09 세션: "3개까지는 자동 노출, 4개째부터 더보기").
-  const restRefs = references.slice(EST_TOP_AUTO_COUNT);
+  // skipCount(2026-09 세션, "단일진단 준거단지 카드 통합") — 단일진단
+  // 3칸에서는 1위+2위만 자동노출(진단분석/동조율 칸에 1개씩)이라 "더보기"가
+  // 3위부터 시작해야 한다 — 호출부(wireEstDetailToggle)가 2를 넘겨준다.
+  // 생략하면(다중비교) 기존 그대로 EST_TOP_AUTO_COUNT(4)부터.
+  const restRefs = references.slice(skipCount==null ? EST_TOP_AUTO_COUNT : skipCount);
   if (!references.length){
     body.innerHTML = '<div class="twin-msg">준거단지를 찾지 못했습니다.</div>';
     return;
@@ -4162,17 +4167,17 @@ function renderEstDetailBody(body, comp, estimate, key){
     const itemModeBtn = body.querySelector('[data-est-item-mode-toggle="'+idx+'"]');
     if (itemModeBtn) itemModeBtn.addEventListener('click', () => {
       cardChartModeOverride.set(itemKey, iMode === 'index' ? 'price' : 'index');
-      renderEstDetailBody(body, comp, estimate, key);
+      renderEstDetailBody(body, comp, estimate, key, skipCount);
     });
     const itemRangeBtn = body.querySelector('[data-est-item-range-toggle="'+idx+'"]');
     if (itemRangeBtn) itemRangeBtn.addEventListener('click', () => {
       cardRangeModeOverride.set(itemKey, iRangeMode === 'overlap' ? 'full' : 'overlap');
-      renderEstDetailBody(body, comp, estimate, key);
+      renderEstDetailBody(body, comp, estimate, key, skipCount);
     });
     const itemBenchBtn = body.querySelector('[data-est-item-bench-toggle="'+idx+'"]');
     if (itemBenchBtn) itemBenchBtn.addEventListener('click', () => {
       cardBenchLineOverride.set(itemKey, !iShowBench);
-      renderEstDetailBody(body, comp, estimate, key);
+      renderEstDetailBody(body, comp, estimate, key, skipCount);
     });
   });
   // 실제가격/상승률 모드 토글은 1~3위 영역(renderEstTopRefs)에 하나만 있고
@@ -4181,18 +4186,22 @@ function renderEstDetailBody(body, comp, estimate, key){
     body.querySelectorAll('[data-est-page]').forEach(btn => {
       btn.addEventListener('click', () => {
         estPageState.set(key, Number(btn.dataset.estPage));
-        renderEstDetailBody(body, comp, estimate, key);
+        renderEstDetailBody(body, comp, estimate, key, skipCount);
       });
     });
   }
 }
-function wireEstDetailToggle(container, comp, estimate){
+function wireEstDetailToggle(container, comp, estimate, opts){
   if (!estimate || !estimate.estimated) return;
+  opts = opts || {};
   // 1~3위(always-visible)는 감싸는 "더 보기" 토글(wrapMoreSection)이 열릴
   // 때까지 차트 생성을 미룬다 — hidden 상태에서 만들면 크기가 0으로 굳는
   // 문제가 있어서다(runWhenSectionVisible, 2026-09 세션 D에서 처음 발견).
+  // opts.skipTopRender(2026-09 세션, "단일진단 준거단지 카드 통합") —
+  // 단일진단 3칸에서는 이 자리(top-body)에 1위 대신 2위 하나만 별도
+  // 함수(renderEstSplitRefs)로 채우므로, 여기서는 기본 렌더링을 건너뛴다.
   const topEl = container.querySelector('[data-est-top-body]');
-  if (topEl){
+  if (topEl && !opts.skipTopRender){
     const topKey = topEl.dataset.estTopBody;
     runWhenSectionVisible(topEl, () => renderEstTopRefs(topEl, comp, estimate, topKey));
   }
@@ -4201,6 +4210,7 @@ function wireEstDetailToggle(container, comp, estimate){
   const key = btn.dataset.estToggle;
   const body = container.querySelector('[data-est-body="'+key+'"]');
   if (!body) return;
+  const skipCount = opts.skipCount;
   if (openEstDetailRows.has(key) && !body.dataset.rendered){
     // 이 "더보기" 토글은 자체 hidden 상태(openEstDetailRows)와는 별개로,
     // wrapMoreSection으로 한 번 더 감싸여 있다 — 카드가 통째로 재렌더될 때
@@ -4208,7 +4218,7 @@ function wireEstDetailToggle(container, comp, estimate){
     // 이유만으로 바로 그리면 바깥이 닫힌 채 그려질 수 있다. 그래서 이쪽도
     // runWhenSectionVisible로 감싼다.
     runWhenSectionVisible(body, () => {
-      renderEstDetailBody(body, comp, estimate, key);
+      renderEstDetailBody(body, comp, estimate, key, skipCount);
       body.dataset.rendered = '1';
     });
   }
@@ -4218,10 +4228,54 @@ function wireEstDetailToggle(container, comp, estimate){
     btn.classList.toggle('open', nowOpen);
     body.style.display = nowOpen ? '' : 'none';
     if (nowOpen && !body.dataset.rendered){
-      renderEstDetailBody(body, comp, estimate, key);
+      renderEstDetailBody(body, comp, estimate, key, skipCount);
       body.dataset.rendered = '1';
     }
   });
+}
+// 항목(2026-09 세션, "단일진단 준거단지 카드 통합") — 단일진단 3칸 레이아웃
+// 전용. 준거단지 1위는 진단분석 칸([data-est-diag-ref]), 2위는 동조율 칸의
+// 기존 top-body 자리([data-est-top-body])에 각각 1개씩 그린다. 두 칸 모두
+// 항상 펼쳐진 상태라(접힌 부모 없음) renderEstTopRefs처럼 지연렌더링할
+// 필요가 없다 — 카드 하나를 그리는 buildEstRefCardHtml을 그대로 재사용하되,
+// namePrefix를 자리별로 다르게 줘서(idx는 둘 다 0) 두 카드의 data-* 속성이
+// 서로 충돌하지 않게 한다.
+function renderEstSplitRefs(diagEl, syncEl, comp, estimate, key){
+  const refs = (estimate && estimate.references) || [];
+  const bench = getVirtualBenchmarkComplex('seoul');
+  function renderOne(el, r, namePrefix){
+    if (!el) return;
+    if (!r){ el.innerHTML = ''; return; }
+    const itemKey = itemOverrideKey(key, namePrefix, r.referenceName);
+    const iMode = cardChartModeOverride.get(itemKey) || 'index';
+    const iRangeMode = cardRangeModeOverride.get(itemKey) || 'overlap';
+    const iShowBench = cardBenchLineOverride.get(itemKey) || false;
+    el.innerHTML = buildEstRefCardHtml(r, 0, true, iMode, namePrefix, iRangeMode, iShowBench);
+    const canvas = el.querySelector('[data-'+namePrefix+'-canvas="0"]');
+    if (canvas && r.overlapYms && r.overlapYms.length){
+      const chart = new Chart(canvas, refMiniChartConfig(comp, r.referenceComplex, r.referenceName, r.overlapYms, iMode, iRangeMode, iShowBench, bench));
+      if (iMode !== 'price') wireChartRebase(chart, canvas, el.querySelector('[data-'+namePrefix+'-reset="0"]'));
+    }
+    const viewBtn = el.querySelector('[data-'+namePrefix+'-view="0"]');
+    if (viewBtn) viewBtn.addEventListener('click', () => handleViewMultiClick(comp.name, r.referenceName, viewBtn));
+    const modeBtn = el.querySelector('[data-'+namePrefix+'-item-mode-toggle="0"]');
+    if (modeBtn) modeBtn.addEventListener('click', () => {
+      cardChartModeOverride.set(itemKey, iMode === 'index' ? 'price' : 'index');
+      renderOne(el, r, namePrefix);
+    });
+    const rangeBtn = el.querySelector('[data-'+namePrefix+'-item-range-toggle="0"]');
+    if (rangeBtn) rangeBtn.addEventListener('click', () => {
+      cardRangeModeOverride.set(itemKey, iRangeMode === 'overlap' ? 'full' : 'overlap');
+      renderOne(el, r, namePrefix);
+    });
+    const benchBtn = el.querySelector('[data-'+namePrefix+'-item-bench-toggle="0"]');
+    if (benchBtn) benchBtn.addEventListener('click', () => {
+      cardBenchLineOverride.set(itemKey, !iShowBench);
+      renderOne(el, r, namePrefix);
+    });
+  }
+  renderOne(diagEl, refs[0], 'est-diag');
+  renderOne(syncEl, refs[1], 'est-sync');
 }
 
 const SYNC_INTERPRETATION = {
@@ -4716,7 +4770,7 @@ function buildRatioStatTooltips(frameLabel){
   };
 }
 
-function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, keyTag, inlineSyncCard, headBadgeHtml, baseCompareHtml, baseIsSameAsCompBench, twinPreviewHtml){
+function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, keyTag, inlineSyncCard, headBadgeHtml, baseCompareHtml, baseIsSameAsCompBench){
   // keyTag: openTwinRows/twinPageState/chartModeState 등 전역 Map/Set의 키 네임스페이스.
   // 생략 시 기존처럼 (wide?'t':'c')를 쓴다. "우리 단지 진단하기" 탭은 항상 i=0,
   // wide=false로 호출되어 다중비교 카드 0번과 키가 겹치므로 's'를 넘겨 분리한다
@@ -4763,7 +4817,14 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
     // tier(veryLow/low/mid/high/veryHigh)를 낮음/비슷/높음 3단계로 접어서
     // 자연스럽게 연결한다(2026-09 세션).
     const estInterpText = buildEstSyncInterpretation(estimate);
-    const hasMoreRefs = estimate.referenceCount > EST_TOP_AUTO_COUNT || (estimate.candidatePool||[]).slice(estimate.referenceCount).some(c=>c.correlation>=EST_EXTRA_CORR_THRESHOLD);
+    // 항목(2026-09 세션, "단일진단 준거단지 카드 통합" 확정) — 단일진단
+    // 3칸에서는 진단분석 칸에 1위, 동조율 칸에 2위 딱 1개씩만 자동노출하고
+    // (renderEstSplitRefs가 처리), 3위부터 "더보기"로 넘긴다. 다중비교에서는
+    // 여전히 EST_TOP_AUTO_COUNT(4)개까지 한 곳에 자동노출하는 기존 동작
+    // 그대로 — 이 분기가 syncHtml 구조 자체는 안 건드리고 "더보기" 등장
+    // 기준값만 갈아끼운다.
+    const topRefsAutoCount = inlineSyncCard ? 2 : EST_TOP_AUTO_COUNT;
+    const hasMoreRefs = estimate.referenceCount > topRefsAutoCount || (estimate.candidatePool||[]).slice(estimate.referenceCount).some(c=>c.correlation>=EST_EXTRA_CORR_THRESHOLD);
     syncHtml =
       '<div class="sync-block">'+
         '<div class="sync-head">'+
@@ -4898,11 +4959,26 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   const saleStatsHtml = priceHighlightHtml+
     '<div class="stat-row"><span class="k">매매 배율 (현재 / 평균) '+ratioTips.saleRatio+'</span><span class="v">'+fmtPct(activeR.currentSaleRatio)+' / '+fmtPct(activeR.avgSaleRatio)+'</span></div>'+
     '<div class="stat-row"><span class="k">매매 갭 '+ratioTips.saleGap+'</span><span class="v '+(activeR.saleGap>0?'down':(activeR.saleGap<0?'up':''))+'">'+fmtEok(activeR.saleGap)+fmtGapPct(activeR.saleGap, activeR.curSalePrice)+'</span></div>';
-  const jeonseStatsHtml =
-    '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균) '+ratioTips.jeonseRatio+'</span><span class="v">'+fmtPct(activeR.currentJeonseRatio)+' / '+fmtPct(activeR.avgJeonseRatio)+'</span></div>'+
-    '<div class="stat-row"><span class="k">전세 갭 '+ratioTips.jeonseGap+'</span><span class="v '+(activeR.jeonseGap>0?'down':(activeR.jeonseGap<0?'up':''))+'">'+fmtEok(activeR.jeonseGap)+fmtGapPct(activeR.jeonseGap, activeR.curJeonsePrice)+'</span></div>';
+  // 항목(2026-09 세션, "전세가율 분석 추가") — 현재/역사적 평균/역사적 최저
+  // 전세가율 3개는 새로 계산한 게 아니라 이미 있던 computeSelfRatioStats
+  // 결과(compRatioStats.cur/avg/minVal)를 그대로 표시 위치만 옮긴 것이다 —
+  // 이 값은 원래도 jeonseRatioContextSentence(아래 ratioSentence)의 근거로
+  // 계산되고 있었는데 숫자 자체는 화면에 안 보이고 문장으로만 녹아 있었다.
+  // "역사적 최저"는 국면6에서 검증된 "전세가율 극단치가 가격 방향을 예고"
+  // 가설과 같은 개념(전세가율 자기이탈 배지가 쓰는 것과 동일한 데이터
+  // 소스)이라 별도 계산이 필요 없었다. jeonseStatsHtml이 compRatioStats를
+  // 참조해야 해서 그 계산을 이 앞으로 옮겼다.
   const compRatioStats = computeSelfRatioStats(comp);
   const compEligibility = jeonseRatioDiagnosisEligible(findBuiltYear(comp.name), compRatioStats, state.threshold);
+  const jeonseHistoryHtml = compRatioStats
+    ? '<div class="stat-row"><span class="k">현재 전세가율</span><span class="v">'+fmtPct(compRatioStats.cur)+'</span></div>'+
+      '<div class="stat-row"><span class="k">역사적 평균 전세가율</span><span class="v">'+fmtPct(compRatioStats.avg)+'</span></div>'+
+      '<div class="stat-row"><span class="k">역사적 최저 전세가율</span><span class="v">'+fmtPct(compRatioStats.minVal)+' ('+fmtYm(compRatioStats.minYm)+')</span></div>'
+    : '';
+  const jeonseStatsHtml =
+    '<div class="stat-row"><span class="k">전세 배율 (현재 / 평균) '+ratioTips.jeonseRatio+'</span><span class="v">'+fmtPct(activeR.currentJeonseRatio)+' / '+fmtPct(activeR.avgJeonseRatio)+'</span></div>'+
+    '<div class="stat-row"><span class="k">전세 갭 '+ratioTips.jeonseGap+'</span><span class="v '+(activeR.jeonseGap>0?'down':(activeR.jeonseGap<0?'up':''))+'">'+fmtEok(activeR.jeonseGap)+fmtGapPct(activeR.jeonseGap, activeR.curJeonsePrice)+'</span></div>'+
+    jeonseHistoryHtml;
   const ratioSentence = compEligibility.eligible
     ? jeonseRatioContextSentence(activeR.diag.badge, compRatioStats, state.threshold) + (compEligibility.note ? ' '+compEligibility.note : '')
     : compEligibility.reason;
@@ -4970,14 +5046,35 @@ function buildDiagCardBody(i, comp, r, sync, wide, estimate, benchStatusHtml, ke
   // 안에 통째로 얹는다(요청하신 "그대로" 유지).
   const advancedBody = jeonseStatsHtml + syncHtml + hedgeHtml + twinHtml + (benchStatusHtml||'');
   if (inlineSyncCard){
-    // 단일진단 탭(시안 B) — "한 줄 요약"은 헤드의 conclusion이 이미 맡고
-    // 있어 msgHtml(unifiedSummary)은 핵심에 다시 안 보여준다. 두 문장을
-    // 합치지 말고 각자 자리로 재배치하라는 요청에 따라, msgHtml은 내용
-    // 그대로 심화분석 안으로 옮긴다. syncCard는 더 이상 쓰지 않는다
-    // (동조율 상세가 상시노출에서 심화분석 안으로 이동했으므로) — 호출부
-    // (renderSingleDiag)에서 빈 값을 그대로 두면 된다.
+    // 항목(2026-09 세션, "단일진단 레이아웃 재구성" 최종 확정) — 그래프는
+    // #singleChartSection 위치에 그대로 두고(호출부에서 처리), 그 아래
+    // 진단 영역을 진단분석/동조율(또는 준거단지)/쌍둥이 단지 3칸으로
+    // 나란히 배치한다. "한 줄 요약"은 헤드의 conclusion이 이미 맡고 있어
+    // msgHtml(unifiedSummary)은 진단분석 칸 안에서도 상세보기 뒤로만
+    // 넣는다(합치지 않고 재배치). 쌍둥이 단지는 노출도를 높이라는 요청에
+    // 따라 심화분석에서 완전히 빼서 독립 칸으로 승격한다 — 실측 사이클이
+    // 있는 단지는 twinHtml 자체가 이미 기본 펼침 상태라 별도 손질 없이도
+    // 바로 카드 내용이 보인다. syncHtml/twinHtml이 이 칸들로 빠지므로
+    // 심화분석에는 전세·헤지·선도단지 현재 위치만 남는다.
+    // 항목(2026-09 세션, "쌍둥이/심화분석 버튼 나란히 배치" 재조정) — 칸3은
+    // 더 이상 쌍둥이 단지를 통째로 펼쳐 보여주지 않는다(세로 길이가
+    // 늘어난다는 지적) — "🧑‍🤝‍🧑 쌍둥이 단지 보기"/"📎 심화분석 보기" 버튼
+    // 2개를 나란히 놓고, 둘 다 클릭하면 원래 있던 패널 방식(openSectionInPanel,
+    // 넓은 화면에서 우측 패널로 열림)을 그대로 쓴다 — wireTwinToggle을
+    // forceInline 없이 호출해 원래의 inSingleDiag+패널 라우팅을 되살린다.
+    // 준거단지 1위 자리 — 실측 사이클이 없는 준신축(estimate 케이스)에서만
+    // 채워진다(renderEstSplitRefs가 [data-est-diag-ref] 컨테이너에 직접
+    // 그린다). 실측 사이클이 있는 단지는 애초에 준거단지 개념이 없어 빈
+    // 문자열 그대로 둔다.
+    const diagRefPlaceholder = (estimate && estimate.estimated) ? '<div class="twin-body" data-est-diag-ref="1"></div>' : '';
+    const diagColHtml = '<div class="card single-diag-subcard single-diag-col-diag"><div class="sync-head"><span class="k">📊 진단분석</span></div>'+saleStatsHtml+msgHtml+diagRefPlaceholder+'</div>';
+    const syncColHtml = '<div class="card single-diag-subcard single-diag-col-sync">'+syncHtml+'</div>';
+    const singleAdvancedBody = jeonseStatsHtml + hedgeHtml + (benchStatusHtml||'');
+    const actionsColHtml = '<div class="card single-diag-subcard single-diag-col-actions">'+
+      '<div class="single-diag-action-row">'+twinHtml+wrapMoreSection('📎 심화분석 보기', singleAdvancedBody, false)+'</div>'+
+    '</div>';
     return {
-      main: headHtml+saleStatsHtml+(twinPreviewHtml||'')+wrapMoreSection('📎 심화분석 더보기', msgHtml+advancedBody, false),
+      main: '<div class="single-diag-cols">'+diagColHtml+syncColHtml+actionsColHtml+'</div>',
       syncCard: '',
     };
   }
@@ -5240,56 +5337,6 @@ function wireBenchStatusCharts(container, bench, target){
     }
   });
 }
-// 항목(2026-09 세션, "단일진단 정보위계 재구성" 시안 B) — 단일진단 탭 핵심에
-// 보여줄 "닮은꼴 1위" 미리보기를 고른다. 심화분석 쪽 쌍둥이 단지 상세
-// (renderTwinBody)와 완전히 같은 선정 기준(matchType==='similar', 상관계수
-// 내림차순 1위)을 그대로 재사용해 두 군데 숫자가 어긋나지 않게 한다.
-// 등급 텍스트/상관계수 숫자는 여기서 아예 안 만든다 — 그래프 자체로
-// "이렇게 똑같이 움직여요"를 보여주는 흥미유발용 요소라는 요청에 따른 것.
-function pickTwinPreview(comp){
-  const { curated, rest } = findTwinCandidates(comp);
-  const pool = curated.concat(rest).filter(t => t.matchType === 'similar');
-  if (!pool.length) return null;
-  return pool.slice().sort((a,b)=> b.corr-a.corr)[0];
-}
-function buildTwinPreviewHtml(twin){
-  if (!twin) return '';
-  return '<div class="twin-preview" data-twin-preview="1" role="button" tabindex="0">'+
-    '<div class="twin-chart-wrap"><canvas data-twin-preview-canvas="1"></canvas></div>'+
-    '<div class="twin-preview-caption">'+esc(twin.name)+'과 거의 똑같이 움직여요 · 더 보려면 탭하세요</div>'+
-  '</div>';
-}
-// 핵심의 미리보기 그래프는 단일진단 화면이 항상 펼쳐진 상태라(접힌 부모가
-// 없음) 다른 미니차트들과 달리 지연렌더링(runWhenElementVisible 등) 없이
-// DOM에 들어가자마자 바로 그린다. 클릭/키보드(enter) 시 심화분석과 그 안의
-// 쌍둥이 단지 섹션을 그대로 열어(이미 있는 토글을 클릭하는 것과 동일) 그
-// 자리로 스크롤한다 — 심화 쪽엔 이 후보를 다시 안 보여주므로(excludeNames)
-// "미리보기 → 더 자세히"로 자연스럽게 이어진다.
-function wireTwinPreview(card, comp, twin){
-  const wrap = card.querySelector('[data-twin-preview="1"]');
-  if (!wrap || !twin) return;
-  const canvas = wrap.querySelector('[data-twin-preview-canvas="1"]');
-  if (canvas){
-    new Chart(canvas, twinMiniChartConfig(comp, twin.complex, twin.name, twin.overlapYms, 'index', 0, null, null, null, twin.decoupling, false, null, 'overlap'));
-  }
-  function openDetail(){
-    const advancedBtn = card.querySelector('.more-section > .section-toggle');
-    // 패널 모드(넓은 화면)에서는 advancedBtn.click()이 심화분석 본문을
-    // #sidePanel로 옮긴다(openSectionInPanel) — 그 안에 있는 쌍둥이 단지
-    // 버튼도 같이 옮겨지므로, 옮겨지기 "전" card 안에서 미리 참조를 잡아둔다
-    // (엘리먼트 참조는 위치가 바뀌어도 그대로 유효하다). 패널 모드는 'open'이
-    // 아니라 'active-panel' 클래스를 쓰므로 두 클래스 모두 "이미 열림"으로
-    // 인정해 중복 클릭으로 도로 닫히는 것을 막는다(openSectionInPanel은
-    // 같은 버튼을 다시 누르면 패널을 닫는 토글 버튼이라서다).
-    const twinBtn = card.querySelector('[data-twin-toggle]');
-    const advancedAlreadyOpen = advancedBtn && (advancedBtn.classList.contains('open') || advancedBtn.classList.contains('active-panel'));
-    if (advancedBtn && !advancedAlreadyOpen) advancedBtn.click();
-    if (twinBtn && !twinBtn.classList.contains('open')) twinBtn.click();
-    (twinBtn || advancedBtn || wrap).scrollIntoView({ behavior:'smooth', block:'start' });
-  }
-  wrap.addEventListener('click', openDetail);
-  wrap.addEventListener('keydown', (e) => { if (e.key==='Enter' || e.key===' '){ e.preventDefault(); openDetail(); } });
-}
 function renderSingleDiag(name){
   const headEl = document.getElementById('singleDiagHead');
   const resultEl = document.getElementById('singleDiagResult');
@@ -5344,29 +5391,36 @@ function renderSingleDiag(name){
     '<div class="single-conclusion">'+esc(conclusion)+'</div>'+
     buildFairPriceSummaryCard(r);
   document.getElementById('singleAddCompareBtn').addEventListener('click', () => addCompareFromSingleDiag(name));
-  // 항목(2026-09 세션, "정보 위계 재구성" 시안 B 확정) — 동조율 상세를 더
-  // 이상 상시노출 별도 카드로 두지 않고 심화분석 진입점 안으로 옮기면서
-  // singleDiagSyncCard 자체가 필요 없어졌다. [hidden] 어트리뷰트는 .card
-  // 클래스의 display:flex 규칙에 밀려 무시되므로(실측 확인 — hidden을 줘도
-  // computedDisplay가 flex로 남아 빈 박스가 보임), 아예 그 카드를 만들지
-  // 않는다.
+  // 항목(2026-09 세션, "단일진단 레이아웃 재구성" 최종 확정) — 진단분석/
+  // 동조율/쌍둥이 단지 3칸이 각자 자기 .card 박스를 갖게 되므로, 이걸 담는
+  // 바깥 컨테이너는 더 이상 .card(테두리 박스)가 아니라 순수 레이아웃
+  // 컨테이너다(이중 테두리 방지). singleDiagSyncCard는 동조율 상세가
+  // 상시노출 별도 카드에서 칸2로 옮겨가며 필요 없어졌다.
   resultEl.innerHTML =
     '<div class="single-diag-row">'+
-      '<div class="card single-diag-card" id="singleDiagCard"></div>'+
+      '<div class="single-diag-body" id="singleDiagCard"></div>'+
     '</div>';
   const card = document.getElementById('singleDiagCard');
   // "우리 단지 진단하기" 탭은 base가 항상 target 자신의 진짜 선도단지라
   // r과 rVsOwnBench가 사실상 같은 값이다 — 토글을 강제로 비활성화한다
-  // (baseIsSameAsCompBench=true). 핵심의 "닮은꼴 1위" 미리보기(twinPreview)는
-  // 심화분석 안 쌍둥이 단지 상세와 같은 선정 기준을 쓰되, 중복 노출을
-  // 피하려고 그 이름을 심화 쪽 렌더링에서 제외한다(excludeNames).
-  const twinPreview = pickTwinPreview(target);
-  const excludeFromDetail = twinPreview ? new Set([twinPreview.name]) : undefined;
-  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true, undefined, seoulRefHtml, true, buildTwinPreviewHtml(twinPreview));
+  // (baseIsSameAsCompBench=true).
+  const built = buildDiagCardBody(0, target, r, sync, false, estimate, buildBenchStatusCard(bench, groupKey, target), 's', true, undefined, seoulRefHtml, true);
   card.innerHTML = built.main;
-  wireTwinPreview(card, target, twinPreview);
-  wireTwinToggle(card, target, r, excludeFromDetail);
-  wireEstDetailToggle(card, target, estimate);
+  // 항목(2026-09 세션, "쌍둥이/심화분석 버튼 나란히 배치" 재조정) — 쌍둥이
+  // 단지가 다시 "버튼 클릭 → 패널" 방식(원래 동작)으로 돌아갔으므로
+  // forceInline 없이 원래대로 호출한다.
+  wireTwinToggle(card, target, r);
+  // 항목(2026-09 세션, "단일진단 준거단지 카드 통합") — 준거단지 1위는
+  // 진단분석 칸, 2위는 동조율 칸에 각각 즉시 렌더링한다(핵심 영역이라
+  // 지연렌더링 불필요). wireEstDetailToggle에는 동조율 칸 쪽 top-body를
+  // 건드리지 말라고(skipTopRender) + "더보기"는 3위부터(skipCount:2) 알려준다.
+  if (estimate && estimate.estimated){
+    const diagRefEl = card.querySelector('[data-est-diag-ref]');
+    const syncRefEl = card.querySelector('[data-est-top-body]');
+    const estKey = syncRefEl ? syncRefEl.dataset.estTopBody : ('est-s-0');
+    renderEstSplitRefs(diagRefEl, syncRefEl, target, estimate, estKey);
+  }
+  wireEstDetailToggle(card, target, estimate, { skipTopRender: true, skipCount: 2 });
   wireBenchStatusCharts(card, bench, target);
   if (chartSectionEl) chartSectionEl.style.display = '';
   renderSingleActiveChart(bench, target);
