@@ -617,6 +617,19 @@ textarea{
 .twin-body{margin-top:8px;display:flex;flex-direction:column;gap:10px;}
 .twin-card{border:1px solid var(--border);border-radius:8px;padding:8px;}
 .twin-card-head{font-size:12.5px;font-weight:700;margin-bottom:6px;}
+/* 항목(2026-09-22 세션, "쌍둥이 단지 즐겨찾기") */
+.twin-fav-btn{
+  border:none;background:none;cursor:pointer;font-size:15px;line-height:1;
+  color:var(--ink-faint);padding:0 2px;vertical-align:-1px;
+}
+.twin-fav-btn.active{color:#e8a33d;}
+.favorites-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;}
+.favorites-actions{display:flex;gap:8px;flex-wrap:wrap;}
+#favoritesList{display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:14px;}
+.favorite-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;gap:6px;}
+.favorite-card-title{font-weight:700;font-size:14px;}
+.favorite-card-meta{font-size:12px;color:var(--ink-muted);}
+.favorite-card-actions{display:flex;gap:8px;margin-top:6px;}
 /* 항목(2026-09-21 세션, "그래프 세로 정렬") — 단일진단 칸1/2 미리보기는
    서로 다른 준거(닮은꼴/괴리) 단지라 헤드 라인 길이가 달라 줄바꿈 여부가
    갈리고, 그만큼 차트가 시작되는 세로 위치가 밀려 두 칸의 차트가 어긋나
@@ -884,6 +897,7 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
   <div class="top-mode-tabs" id="topModeTabs">
     <button class="top-mode-btn active" data-top-mode="multi">📊 여러 단지 비교</button>
     <button class="top-mode-btn" data-top-mode="single">🏠 우리 단지 진단하기</button>
+    <button class="top-mode-btn" data-top-mode="favorites">⭐ 즐겨찾기</button>
   </div>
 
   <section id="singleDiagSection" class="single-diag-wrap" hidden>
@@ -933,6 +947,22 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
       <div class="common-range" id="singleFairOutlookNote"></div>
     </div>
     <div id="singleDiagResult" style="margin-top:20px;"></div>
+  </section>
+
+  <!-- 항목(2026-09-22 세션, "쌍둥이 단지 즐겨찾기") — 다중비교/단일진단
+       기존 2개 탭과 같은 top-mode-tabs 전환 방식으로 3번째 탭을 추가한다.
+       서버·로그인 없이 localStorage(benchmarkCalc_twinFavorites_v1)만 쓴다. -->
+  <section id="favoritesSection" hidden>
+    <div class="favorites-header">
+      <h2 id="favoritesCountLabel">⭐ 즐겨찾기</h2>
+      <div class="favorites-actions">
+        <button class="btn small" id="favCsvBtn">📥 CSV 다운로드</button>
+        <button class="btn small" id="favJsonExportBtn">💾 JSON 내보내기</button>
+        <button class="btn small" id="favJsonImportBtn">📤 JSON 불러오기</button>
+        <input type="file" id="favJsonImportInput" accept="application/json" hidden>
+      </div>
+    </div>
+    <div id="favoritesList"></div>
   </section>
 
   <div class="shell-body" id="multiCompareShell">
@@ -3678,6 +3708,56 @@ function twinPredictionMonthsOf(t){
 // 놓일 컨테이너 안에서만 유일하면 되므로(각자 다른 컨테이너의 querySelector로
 // 스코프됨), renderTwinBody의 목록에서는 페이지 내 순번을, renderTwinSplitPreview
 // 에서는 항상 0을 넘긴다.
+// 항목(2026-09-22 세션, "쌍둥이 단지 즐겨찾기") — 서버/로그인 없이
+// localStorage에만 저장한다. 이 계산기는 단지를 식별할 때 어디서도 별도
+// ID를 쓰지 않고 전부 이름(name)으로 식별하므로(buildComplex도 id 필드가
+// 없음) 즐겨찾기도 (기준단지명, twin단지명) 텍스트 쌍으로 식별한다 —
+// 라이브러리 안에서 이름은 사실상 유일해 재계산에 문제없다(사용자 확인
+// 완료). 그래프 이미지가 아니라 이 레코드만 저장해두고, "모아보기"에서
+// 클릭하면 findTwinCandidates(comp)를 다시 돌려 최신 데이터로 재현한다.
+const TWIN_FAVORITES_KEY = 'benchmarkCalc_twinFavorites_v1';
+function loadTwinFavorites(){
+  try {
+    const raw = localStorage.getItem(TWIN_FAVORITES_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch (e) { return []; }
+}
+function saveTwinFavorites(list){
+  try { localStorage.setItem(TWIN_FAVORITES_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function findTwinFavoriteIndex(list, baseName, twinName){
+  return list.findIndex(f => f.baseName === baseName && f.twinName === twinName);
+}
+function isTwinFavorited(baseName, twinName){
+  return findTwinFavoriteIndex(loadTwinFavorites(), baseName, twinName) >= 0;
+}
+// 클릭 시점 t/comp에서 즉시 레코드를 만든다 — savedAt은 저장되는 순간에만
+//새로 찍고, 이미 저장돼 있으면(토글 OFF) savedAt과 무관하게 그냥 지운다.
+function buildTwinFavoriteRecord(comp, t){
+  return {
+    baseName: comp.name,
+    twinName: t.name,
+    matchType: t.matchType,
+    corr: t.corr,
+    overlapMonths: t.overlapMonths,
+    decouplingGap: (t.decoupling && t.decoupling.gap != null) ? t.decoupling.gap : null,
+    savedAt: new Date().toISOString(),
+  };
+}
+// 반환값: 토글 후 "지금 즐겨찾기 상태인가"(true=저장됨).
+function toggleTwinFavorite(comp, t){
+  const list = loadTwinFavorites();
+  const idx = findTwinFavoriteIndex(list, comp.name, t.name);
+  if (idx >= 0){
+    list.splice(idx, 1);
+    saveTwinFavorites(list);
+    return false;
+  }
+  list.push(buildTwinFavoriteRecord(comp, t));
+  saveTwinFavorites(list);
+  return true;
+}
 function buildTwinCardHtml(t, idx, comp, r, bestFairPriceCandidate, iMode, iRangeMode, iShowBench){
   const pm = twinPredictionMonthsOf(t);
   const cls = twinClsOf(t);
@@ -3722,8 +3802,10 @@ function buildTwinCardHtml(t, idx, comp, r, bestFairPriceCandidate, iMode, iRang
   // 주석 참고). 상세보기(twinInterpretationText)는 매치타입과 무관하게
   // 항상 정확한 숫자를 유지한다.
   const corrDisplay = t.matchType === 'similar' ? twinSimilarityLabel(t.corr) : '상관계수 '+t.corr.toFixed(2);
+  const favActive = isTwinFavorited(comp.name, t.name);
+  const favBtnHtml = '<button class="twin-fav-btn'+(favActive?' active':'')+'" data-twin-fav="'+idx+'" type="button" aria-label="즐겨찾기">'+(favActive?'★':'☆')+'</button>';
   return '<div class="twin-card">'+
-    '<div class="twin-card-head">'+twinMatchTypeTag(t)+' '+twinOngoingBadge(t)+' '+esc(t.name)+' <span class="cell-ratio">('+corrDisplay+', 겹치는 구간 '+t.overlapMonths+'개월)</span></div>'+
+    '<div class="twin-card-head">'+twinMatchTypeTag(t)+' '+twinOngoingBadge(t)+' '+esc(t.name)+' <span class="cell-ratio">('+corrDisplay+', 겹치는 구간 '+t.overlapMonths+'개월)</span>'+favBtnHtml+'</div>'+
     itemToggleRowHtml+
     '<div class="twin-chart-note">'+(iMode==='price'?'실제 가격(억원) · 같은 축 공유':'양쪽 모두 시작 시점 대비 상승률(%) · 그래프의 지점을 클릭하면 그 지점을 새 기준점으로 다시 계산합니다')+(iRangeMode==='full' ? '' : decoupleNoteHtml+(hasDrawableEpisodes?' · 파란 음영=과거 완결된 갭메우기 에피소드':''))+benchLineNoteHtml+rangeNoteHtml+'</div>'+
     predictionNoteHtml+
@@ -3756,6 +3838,13 @@ function wireOneTwinCard(containerEl, t, idx, comp, r, bestFairPriceCandidate, i
   }
   const viewBtn = containerEl.querySelector('[data-twin-view="'+idx+'"]');
   if (viewBtn) viewBtn.addEventListener('click', () => handleViewMultiClick(comp.name, t.name, viewBtn));
+  const favBtn = containerEl.querySelector('[data-twin-fav="'+idx+'"]');
+  if (favBtn) favBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const active = toggleTwinFavorite(comp, t);
+    favBtn.classList.toggle('active', active);
+    favBtn.textContent = active ? '★' : '☆';
+  });
   const itemModeBtn = containerEl.querySelector('[data-item-mode-toggle="'+idx+'"]');
   if (itemModeBtn) itemModeBtn.addEventListener('click', () => {
     cardChartModeOverride.set(itemKey, iMode === 'index' ? 'price' : 'index');
@@ -5842,9 +5931,130 @@ function setTopMode(mode){
   if (mode !== 'single') closeSidePanel();
   document.getElementById('multiCompareShell').hidden = mode !== 'multi';
   document.getElementById('singleDiagSection').hidden = mode !== 'single';
+  document.getElementById('favoritesSection').hidden = mode !== 'favorites';
   if (mode === 'single' && state.singleTargetName){
     renderSingleDiag(state.singleTargetName);
   }
+  if (mode === 'favorites') renderFavoritesTab();
+}
+
+// 항목(2026-09-22 세션, "쌍둥이 단지 즐겨찾기 모아보기") — 저장된 레코드로
+// UI를 그린다. "다시 보기"는 기존 viewComplexPairInMultiCompare(이미 "여러
+// 단지 비교에서 보기" 버튼이 쓰는 함수)를 그대로 재사용해 findTwinCandidates
+// 등을 새로 계산한 최신 결과로 보여준다 — 즐겨찾기는 좌표(레코드)만 들고
+// 있고 그래프는 저장하지 않는다.
+function twinFavMatchLabel(matchType){
+  return matchType === 'similar' ? '🎯 닮은꼴' : matchType === 'gap' ? '📊 현재괴리' : (matchType || '');
+}
+function renderFavoritesTab(){
+  const list = loadTwinFavorites();
+  const countLabel = document.getElementById('favoritesCountLabel');
+  if (countLabel) countLabel.textContent = '⭐ 즐겨찾기 ('+list.length+'개 저장됨)';
+  const listEl = document.getElementById('favoritesList');
+  if (!listEl) return;
+  if (!list.length){
+    listEl.innerHTML = '<div class="empty-state">즐겨찾기한 쌍둥이 단지가 없습니다. 쌍둥이 단지 카드의 ☆을 눌러 저장해보세요.</div>';
+    return;
+  }
+  // 최신 저장분이 위로 오게 정렬한다.
+  const sorted = list.slice().sort((a,b) => String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
+  listEl.innerHTML = sorted.map((f, i) => {
+    const gapText = f.decouplingGap != null ? f.decouplingGap.toFixed(1)+'%p' : '—';
+    const savedDate = f.savedAt ? f.savedAt.slice(0,10) : '—';
+    return '<div class="favorite-card">'+
+      '<div class="favorite-card-title">'+esc(f.baseName)+' ↔ '+esc(f.twinName)+'</div>'+
+      '<div class="favorite-card-meta">'+esc(twinFavMatchLabel(f.matchType))+' · 상관계수 '+(f.corr!=null?f.corr.toFixed(2):'—')+' · 겹침 '+(f.overlapMonths!=null?f.overlapMonths:'—')+'개월</div>'+
+      '<div class="favorite-card-meta">배율괴리 '+gapText+' · 저장 '+esc(savedDate)+'</div>'+
+      '<div class="favorite-card-actions">'+
+        '<button class="btn small" data-fav-view="'+i+'">🔍 다시 보기</button>'+
+        '<button class="btn small" data-fav-delete="'+i+'">🗑</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  listEl.querySelectorAll('[data-fav-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rec = sorted[Number(btn.dataset.favView)];
+      viewComplexPairInMultiCompare(rec.baseName, rec.twinName);
+    });
+  });
+  listEl.querySelectorAll('[data-fav-delete]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rec = sorted[Number(btn.dataset.favDelete)];
+      const cur = loadTwinFavorites();
+      const idx = findTwinFavoriteIndex(cur, rec.baseName, rec.twinName);
+      if (idx >= 0){ cur.splice(idx, 1); saveTwinFavorites(cur); }
+      // 확인창 없이 즉시 삭제한다(2026-09-22 세션, 사용자 확인 완료) —
+      // 이 정도 기능에는 undo 없는 즉시 처리가 더 낫다는 판단.
+      renderFavoritesTab();
+    });
+  });
+}
+
+function csvEscapeField(v){
+  const s = String(v==null ? '' : v);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+function downloadTextFile(filename, mime, text){
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+// 서식(색상)이 필요 없는 단순 표라 ExcelJS/SheetJS 없이 CSV로 내보낸다 —
+// 엑셀에서 바로 열리고 새 라이브러리도 필요 없다. UTF-8 BOM을 붙여야
+// 엑셀에서 한글이 깨지지 않는다.
+function exportFavoritesCsv(){
+  const list = loadTwinFavorites();
+  if (!list.length){ alert('저장된 즐겨찾기가 없습니다.'); return; }
+  const header = ['단지명 쌍','매치타입','상관계수','겹침개월수','배율괴리(%p)','저장일시'];
+  const rows = list.map(f => [
+    f.baseName+' ↔ '+f.twinName,
+    f.matchType === 'similar' ? '닮은꼴' : f.matchType === 'gap' ? '현재괴리' : (f.matchType||''),
+    f.corr!=null ? f.corr.toFixed(2) : '',
+    f.overlapMonths!=null ? f.overlapMonths : '',
+    f.decouplingGap!=null ? f.decouplingGap.toFixed(1) : '',
+    f.savedAt || '',
+  ]);
+  const csv = [header].concat(rows).map(r => r.map(csvEscapeField).join(',')).join('\r\n');
+  const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  downloadTextFile('쌍둥이단지_즐겨찾기_'+today+'.csv', 'text/csv;charset=utf-8', '﻿'+csv);
+}
+// exportLibrary/importLibraryFile(단지 라이브러리 JSON 내보내기/불러오기)와
+// 같은 {type, version, ...} 봉투 형식을 그대로 따른다 — 이 계산기 안에서
+// JSON 백업 파일의 모양을 하나로 통일한다.
+function exportFavoritesJson(){
+  const list = loadTwinFavorites();
+  if (!list.length){ alert('저장된 즐겨찾기가 없습니다.'); return; }
+  const payload = { type:'benchmark-calc-twin-favorites', version:1, favorites:list };
+  const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  downloadTextFile('쌍둥이단지_즐겨찾기_'+today+'.json', 'application/json;charset=utf-8', JSON.stringify(payload, null, 2));
+}
+function importFavoritesJsonFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data && data.favorites) ? data.favorites : Array.isArray(data) ? data : null;
+      if (!incoming) throw new Error('invalid format');
+      const cur = loadTwinFavorites();
+      let added = 0, skipped = 0;
+      incoming.forEach(rec => {
+        if (!rec || !rec.baseName || !rec.twinName){ skipped++; return; }
+        // 이름+twin이 완전히 같은 항목만 중복으로 보고 건너뛴다(기존 저장분과 병합, 덮어쓰기 아님).
+        if (findTwinFavoriteIndex(cur, rec.baseName, rec.twinName) >= 0){ skipped++; return; }
+        cur.push(rec);
+        added++;
+      });
+      saveTwinFavorites(cur);
+      renderFavoritesTab();
+      alert('가져오기 완료: 신규 '+added+'개'+(skipped>0 ? ', 중복/무효 '+skipped+'개 제외' : '')+' (총 '+cur.length+'개)');
+    } catch (e){
+      alert('파일을 읽을 수 없습니다. 이 계산기에서 내보낸 즐겨찾기 JSON 파일인지 확인해주세요.');
+    }
+  };
+  reader.readAsText(file, 'utf-8');
 }
 
 function renderSummaryCards(base){
@@ -7411,6 +7621,14 @@ function wireStaticEvents(){
   document.getElementById('libImportInput').addEventListener('change', (e)=>{
     const file = e.target.files[0];
     if (file) importLibraryFile(file);
+    e.target.value = '';
+  });
+  document.getElementById('favCsvBtn').addEventListener('click', exportFavoritesCsv);
+  document.getElementById('favJsonExportBtn').addEventListener('click', exportFavoritesJson);
+  document.getElementById('favJsonImportBtn').addEventListener('click', ()=> document.getElementById('favJsonImportInput').click());
+  document.getElementById('favJsonImportInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if (file) importFavoritesJsonFile(file);
     e.target.value = '';
   });
   document.getElementById('gasUrlInput').addEventListener('change', (e)=>{
