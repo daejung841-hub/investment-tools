@@ -514,6 +514,11 @@ textarea{
   font-size:11px;padding:2px 7px;border-radius:5px;letter-spacing:.02em;
 }
 .tip-kv span{flex:1;}
+/* "선도단지란?" 같은 긴 설명 — 질문형 소제목 여러 개가 세로로 쌓이는 구조라
+   .tip-kv(한 줄짜리 배지+설명)와 달리 소제목을 별도 줄(block)로 뺀다. */
+.tip-sec{margin-top:8px;}
+.tip-sec:first-child{margin-top:0;}
+.tip-sec b{display:block;color:var(--accent);font-weight:700;margin-bottom:2px;}
 /* 화면 위쪽 근처(진단요약 카드 맨 위 줄, 시세표 sticky 헤더 등)의 정보
    아이콘은 기본값(위로 열림)대로 두면 툴팁 박스가 뷰포트 밖으로 잘려
    안 보인다(2026-09-19 세션) — JS(positionInfoTip)가 아이콘이 화면 위쪽에
@@ -840,9 +845,9 @@ tr.diag-detail-row td{white-space:normal;background:var(--surface-alt);padding:1
    훨씬 커지면, 이 표처럼 행이 많은(120개월) 스크롤 테이블에서 sticky
    헤더 바로 위 행 하나가 헤더 뒤로 완전히 가려지지 않고 살짝 비쳐 보이는
    현상이 생긴다. 헤더 높이를 줄여서 이 문제를 없앤다. */
-.recent-box th.name-th{font-weight:700;color:var(--ink);text-transform:none;letter-spacing:0;font-size:11.5px;padding-top:3px;padding-bottom:3px;line-height:1.25;}
-.recent-box th.name-th .ratio-tag{display:block;color:var(--ink-faint);font-weight:600;font-size:10px;margin-top:0;}
-.recent-box th.name-th .ath-tag{display:block;color:var(--ink-faint);font-weight:500;font-size:11px;margin-top:0;}
+.recent-box th.name-th{font-weight:700;color:var(--ink);text-transform:none;letter-spacing:0;font-size:12.5px;padding-top:1px;padding-bottom:1px;line-height:1.25;}
+.recent-box th.name-th .ratio-tag{display:block;color:var(--ink-faint);font-weight:600;font-size:11px;margin-top:0;}
+.recent-box th.name-th .ath-tag{display:block;color:var(--ink-faint);font-weight:500;font-size:12.5px;margin-top:0;}
 .cell-ratio{color:var(--ink-faint);font-size:10.5px;}
 .recent-box td.cell-over, #summaryTable td.cell-over{background:var(--bad-bg);}
 .recent-box td.cell-over .cell-ratio, #summaryTable td.cell-over .cell-ratio{color:var(--bad);}
@@ -932,6 +937,12 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
             <button class="btn small fair-cta" id="singleRatioPeakToggle">📈 최고점 표시(전세가율)</button>
             <button class="btn small fair-cta" id="singleRatioTroughToggle">📉 최저점 표시(전세가율)</button>
             <button class="btn small fair-cta" id="singleBenchmarkOverlayToggle">🏙️ 선도단지 표시</button>
+            <span class="info-icon" tabindex="0"><span class="info-tip-html">
+              <div class="tip-sec"><b>선도단지란?</b>선도단지는 서울에서 가장 먼저 움직이며, 서울 전체 흐름을 대표하는 단지들을 묶어놓은 기준선입니다.</div>
+              <div class="tip-sec"><b>왜 필요한가요?</b>부동산 시장은 모든 단지가 동시에 오르지 않습니다. 자금과 관심이 먼저 몰리는 곳이 먼저 움직이고, 그 흐름이 시차를 두고 주변 단지로 번져갑니다. 선도단지는 이 흐름의 출발점 역할을 하는 기준점입니다.</div>
+              <div class="tip-sec"><b>어떻게 해석하나요?</b>내 단지가 선도단지 대비 어느 위치에 있는지를 보면, 지금까지 시장 흐름을 얼마나 따라왔는지, 그리고 아직 따라가지 못한 만큼의 여력이 있는지를 가늠할 수 있습니다.</div>
+              <div class="tip-sec"><b>근거</b>실제 시세 데이터를 분석한 결과, 서울을 대표하는 단지들을 기준으로 봤을 때 시장의 상승·하락 흐름이 뚜렷하게 나타났습니다. 이 계산기는 이 흐름을 기준으로 각 단지의 위치를 진단합니다.</div>
+            </span>ⓘ</span>
             <select class="btn small" id="singleBenchmarkOverlaySelect">
               <option value="seoul">서울 선도단지(일반)</option>
             </select>
@@ -1068,6 +1079,12 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
               <button class="btn small fair-cta" id="ratioPeakToggle">📈 최고점 표시(전세가율)</button>
               <button class="btn small fair-cta" id="ratioTroughToggle">📉 최저점 표시(전세가율)</button>
               <button class="btn small fair-cta" id="benchmarkOverlayToggle">🏙️ 선도단지 표시</button>
+              <span class="info-icon" tabindex="0"><span class="info-tip-html">
+                <div class="tip-sec"><b>선도단지란?</b>선도단지는 서울에서 가장 먼저 움직이며, 서울 전체 흐름을 대표하는 단지들을 묶어놓은 기준선입니다.</div>
+                <div class="tip-sec"><b>왜 필요한가요?</b>부동산 시장은 모든 단지가 동시에 오르지 않습니다. 자금과 관심이 먼저 몰리는 곳이 먼저 움직이고, 그 흐름이 시차를 두고 주변 단지로 번져갑니다. 선도단지는 이 흐름의 출발점 역할을 하는 기준점입니다.</div>
+                <div class="tip-sec"><b>어떻게 해석하나요?</b>내 단지가 선도단지 대비 어느 위치에 있는지를 보면, 지금까지 시장 흐름을 얼마나 따라왔는지, 그리고 아직 따라가지 못한 만큼의 여력이 있는지를 가늠할 수 있습니다.</div>
+                <div class="tip-sec"><b>근거</b>실제 시세 데이터를 분석한 결과, 서울을 대표하는 단지들을 기준으로 봤을 때 시장의 상승·하락 흐름이 뚜렷하게 나타났습니다. 이 계산기는 이 흐름을 기준으로 각 단지의 위치를 진단합니다.</div>
+              </span>ⓘ</span>
               <select class="btn small" id="benchmarkOverlaySelect">
                 <option value="seoul">서울 선도단지(일반)</option>
               </select>
@@ -6386,10 +6403,16 @@ function estimateTipHeight(icon, tipWidth){
   // visibility:hidden 상태에서도 레이아웃 박스가 그대로 계산되므로(pseudo
   // element인 ::after data-tip과 달리), opacity/visibility를 굳이 바꾸지
   // 않고 getBoundingClientRect()로 바로 실측한다.
+  // "선도단지란?" 툴팁(2026-09-23 세션)처럼 섹션이 여러 개라 220px을 넘는
+  // 실제 높이가 나오는 경우, 여기서도 220으로 잘라버리면 실제로는 위쪽 공간이
+  // 부족한데도(rect.top < 220) 계산상 "충분하다"고 오판해 tip-below로 안
+  // 뒤집혀 화면 위로 잘려 보인다(실측으로 확인). 이 branch는 char-count
+  // 추정이 아니라 실제 DOM에서 잰 정확한 높이라 상한을 씌울 이유가 없다 —
+  // 상한은 아래 fallback(글자수 추정, 부정확할 수 있어 안전판이 필요)에만 남긴다.
   const rich = icon.querySelector(':scope > .info-tip-html');
   if (rich){
     const h = rich.getBoundingClientRect().height;
-    if (h > 0) return Math.min(220, Math.max(50, Math.ceil(h) + 4));
+    if (h > 0) return Math.max(50, Math.ceil(h) + 4);
   }
   const text = getTipText(icon);
   const charsPerLine = Math.max(10, Math.round((tipWidth-24) / 10.7)); // 236px 기준 22자였던 비율을 그대로 유지
