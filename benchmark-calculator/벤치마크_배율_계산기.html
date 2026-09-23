@@ -298,8 +298,7 @@ textarea{
    전체 컨테이너 폭을 1100px대→1500px로 넓혀 시세표·그래프가 더 넓게 보이게 한다. */
 .single-diag-wrap{max-width:1500px;margin:0 auto;}
 .single-search-wrap{margin-bottom:18px;}
-.single-nav-links{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
-.single-nav-links a.btn{text-decoration:none;}
+.topbar-actions a.btn{text-decoration:none;}
 .single-target-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .single-add-compare-btn{margin-left:auto;}
 .single-target-head .name{font-weight:700;font-size:18px;}
@@ -889,6 +888,13 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
       <div class="sub">대장 단지 대비 매매·전세 배율로 이론적 적정가를 역산해 저평가·고평가를 진단합니다 <span class="data-asof-badge" id="dataAsOfBadge" hidden></span></div>
     </div>
     <div class="topbar-actions">
+      <!-- 항목(2026-09-23 세션, "네비게이션 버튼 위치") — 단일진단 화면
+           상단에 별도 줄로 있던 걸 헤더 우측(🌙/초기화 버튼과 같은 자리)
+           으로 옮김. gate.js 인증은 sessionStorage 기반이라 다른 도구로
+           이동해도 비밀번호를 다시 묻지 않는다. 모든 탭에서 항상 보인다. -->
+      <a class="btn" href="급지표.html">📋 급지표</a>
+      <a class="btn" href="../rate-simulator/비례율_시뮬레이터.html">🧮 비례율 계산기</a>
+      <a class="btn" href="../index.html">🏠 초기화면</a>
       <button class="btn icon-btn" id="themeToggleBtn" type="button" title="다크 모드로 전환">🌙</button>
       <button class="btn" id="resetBtn">초기화</button>
     </div>
@@ -901,17 +907,6 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
   </div>
 
   <section id="singleDiagSection" class="single-diag-wrap" hidden>
-    <!-- 항목(2026-09-22 세션, "네비게이션 버튼") — 5개 도구 통합 배포 구조
-         (index.html 카드 그리드 + benchmark-calculator/rate-simulator 폴더)를
-         그대로 활용한 상대경로 링크. gate.js의 인증 상태는 sessionStorage
-         기반이라(주석 참고) 같은 탭에서 다른 도구로 이동해도 비밀번호를
-         다시 묻지 않는다 — 단지를 아직 안 골랐어도 바로 보이도록 검색창
-         위에 둔다. -->
-    <div class="single-nav-links">
-      <a class="btn small" href="급지표.html">📋 급지표</a>
-      <a class="btn small" href="../rate-simulator/비례율_시뮬레이터.html">🧮 비례율 계산기</a>
-      <a class="btn small" href="../index.html">🏠 초기화면</a>
-    </div>
     <div class="single-search-wrap">
       <div class="lib-search-wrap">
         <input class="textish lib-search" id="singleLibSearch" placeholder="🔍 우리 단지명을 검색하세요..." autocomplete="off">
@@ -956,9 +951,9 @@ footer{margin-top:36px;color:var(--ink-faint);font-size:12px;text-align:center;}
     <div class="favorites-header">
       <h2 id="favoritesCountLabel">⭐ 즐겨찾기</h2>
       <div class="favorites-actions">
-        <button class="btn small" id="favCsvBtn">📥 CSV 다운로드</button>
-        <button class="btn small" id="favJsonExportBtn">💾 JSON 내보내기</button>
-        <button class="btn small" id="favJsonImportBtn">📤 JSON 불러오기</button>
+        <button class="btn small" id="favCsvBtn">📥 엑셀로 내보내기</button>
+        <button class="btn small" id="favJsonExportBtn">💾 즐겨찾기 파일 내보내기</button>
+        <button class="btn small" id="favJsonImportBtn">📤 즐겨찾기 파일 불러오기</button>
         <input type="file" id="favJsonImportInput" accept="application/json" hidden>
       </div>
     </div>
@@ -6051,7 +6046,7 @@ function importFavoritesJsonFile(file){
       renderFavoritesTab();
       alert('가져오기 완료: 신규 '+added+'개'+(skipped>0 ? ', 중복/무효 '+skipped+'개 제외' : '')+' (총 '+cur.length+'개)');
     } catch (e){
-      alert('파일을 읽을 수 없습니다. 이 계산기에서 내보낸 즐겨찾기 JSON 파일인지 확인해주세요.');
+      alert('파일을 읽을 수 없습니다. 이 계산기에서 내보낸 즐겨찾기 파일이 맞는지 확인해주세요.');
     }
   };
   reader.readAsText(file, 'utf-8');
